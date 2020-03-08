@@ -3,16 +3,52 @@
 This should be split out to a twilio service (potentially shared fate with the webservice)
 driven via pubsub.
 """
-import pdb
-import argparse
-import base64
-import datetime
-import uuid
+
+import logging
+import os
+import sys
+
+from cloud_handler import CloudLoggingHandler
+from google.cloud import pubsub_v1
 from google.cloud import spanner
 from google.cloud.spanner_v1 import param_types
-from cloud_handler import CloudLoggingHandler
+import argparse
+import base64
 import database
+import datetime
+import pdb
+import time
+import uuid
+
+# TODO project_id = "Your Google Cloud Project ID"
+# TODO topic_name = "Your Pub/Sub topic name"
+
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(project_id, topic_name)
+
+
 processor_uuid = base64.b64encode(uuid.uuid1().bytes)
+
+SPANNER_INSTANCE_ID = "test-instance"
+SPANNER_DATABASE_ID = "phone_schedule"
+PROJECT = 'hazel-strand-270418' 
+TOPIC = 'scheduler'
+
+root_logger = None
+
+def setup_logging(logger_name='cron_executor'):
+    root_logger = logging.getLogger(logger_name)
+    root_logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler(sys.stderr)
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    root_logger.addHandler(ch)
+    cloud_handler = CloudLoggingHandler(on_gce=True, logname="task_runner")
+    root_logger.addHandler(cloud_handler)
+
+
 
 def process_single_call(instance_id, database_id):
     all_calls = database.read_calls(instance_id, database_id)
@@ -33,9 +69,19 @@ def process_single_text(instance_id, database_id):
             claimed_text_uuid = text_uuid
             print("Worker dispatching %s" % claimed_text_uuid)
             break
-        
-        
 
+def process_texts(instance_id, database_id):
+    all_texts = database.read_texts(instance_id, database_id)
+
+
+
+        
+class DispatcherService():
+    def __init__(self):
+        pass
+
+    def process_queue(self):
+        
 if __name__ == '__main__':  # noqa: C901
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -56,4 +102,12 @@ if __name__ == '__main__':  # noqa: C901
         process_single_call(args.instance_id, args.database_id)
     if args.command == 'process_single_text':
         process_single_text(args.instance_id, args.database_id)
-    
+
+    if args.command == 'process_calls':
+        while True:
+            process_single_call(args.instance_id, args.database_id)
+            sleep(60)
+    if args.command == 'process_texts':
+        while True:
+            process_single_text(args.instance_id, args.database_id)
+            sleep(60)

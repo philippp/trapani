@@ -75,6 +75,7 @@ class Executor():
                  project='myproject',
                  subname='default_sub',
                  task_cmd="sleep 20",
+                 task_lambda=None
                  deadline=60):
         self.topic = topic
         self.project = project
@@ -86,7 +87,8 @@ class Executor():
         self.io_queue = Queue()
         self.lease_start = None
         self.job_log = logging.getLogger(self.subname)
-
+        self.task_lambda = task_lambda
+        
     def create_subscription(self, deadline=60):
         log.debug("creating subscription")
         body = {
@@ -161,6 +163,10 @@ class Executor():
             body=body).execute()
         return resp
 
+    def run_lambda(self, msg):
+        if self.task_lambda:
+            self.task_lambda()
+            
     def run_task(self, msg):
         proc = Popen(self.task_cmd, stdout=PIPE, shell=True)
         stdout_reader = AsynchronousFileReader(proc.stdout, self.io_queue)

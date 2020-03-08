@@ -1,1 +1,1 @@
-pip install google-cloud-spanner
+pip install --upgrade google-cloud-spanner google-cloud-pubsub twilio

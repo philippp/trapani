@@ -65,7 +65,7 @@ SELECT
   Texts.Message
 FROM Texts
 LEFT JOIN Contacts ON ContactUUID = Contacts.UUID
-WHERE ScheduledTime <= @cutoff_time
+WHERE ScheduledTime <= @cutoff_time AND ProcessorUUID IS NULL
         """,
         params={'cutoff_time':cutoff_time},
         param_types={'cutoff_time' : param_types.TIMESTAMP})
@@ -116,7 +116,9 @@ def attempt_lock_entity(instance_id, database_id, entity_uuid, entity_table_name
         )
         print("{} record(s) updated.".format(row_ct))
 
-    database.run_in_transaction(write_with_struct)
+    v = database.run_in_transaction(write_with_struct)
+    pdb.set_trace()
+    print(row_ct)
     return row_ct
 
 
