@@ -9,10 +9,29 @@ import uuid
 import argparse
 import pdb
 import time
+import http.server
+import time
 
 SPANNER_INSTANCE_ID = "test-instance"
 SPANNER_DATABASE_ID = "phone_schedule"
-SLEEP_PERIOD = 10
+CYCLE_LOG_N = 10
+SLEEP_PERIOD_SECONDS = 10
+HTTP_REQUEST_PERIOD = 2  # 0.5 QPS
+CYCLE = 0
+#def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
+
+#This class will handles any incoming request from
+#the browser 
+class ProofOfLifeHandler(http.server.BaseHTTPRequestHandler):
+    #Handler for the GET requests
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type','text/html')
+        self.end_headers()
+        # Send the html message
+        self.wfile.write(("Currently on cycle %d!" % CYCLE).encode())
+        return
+    
 class DispatcherService():
     
     def __init__(self, account_sid, auth_token, client_phone_number, dry_run=False):
@@ -24,6 +43,10 @@ class DispatcherService():
         self.dry_run = dry_run
         self.database = database.Database(SPANNER_INSTANCE_ID, SPANNER_DATABASE_ID)
         self.database.connect()
+
+        server_address = ('0.0.0.0', 8000)
+        self.httpd = http.server.HTTPServer(server_address, ProofOfLifeHandler)
+        self.httpd.timeout = HTTP_REQUEST_PERIOD
         
     def dispatch_one_text(self):
         """
@@ -62,14 +85,20 @@ class DispatcherService():
         """
         Dispatch messages while the job is alive.
         """
-        cycle_count = 0
+        global CYCLE
         while True:
-            cycle_count += 1
+            start_t = time.time()
+            for i in range(int(SLEEP_PERIOD_SECONDS / HTTP_REQUEST_PERIOD)):
+                self.httpd.handle_request()
+            end_t = time.time()
+            remaining_sleep = SLEEP_PERIOD_SECONDS - (end_t - start_t)
+            if remaining_sleep > 0:
+                time.sleep(remaining_sleep)
+            CYCLE += 1
             if self.dispatch_one_text():
                 print("Dispatched a text!")
-                time.sleep(SLEEP_PERIOD)
-            if cycle_count % 10 == 0:
-                print("Cycle %d" % cycle_count)
+            if CYCLE % CYCLE_LOG_N == 0:
+                print("Cycle %d" % CYCLE)
         
 if __name__ == '__main__':  # noqa: C901
     parser = argparse.ArgumentParser(
