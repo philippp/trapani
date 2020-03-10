@@ -29,7 +29,7 @@ class ProofOfLifeHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-type','text/html')
         self.end_headers()
         # Send the html message
-        self.wfile.write(("Currently on cycle %d!" % CYCLE).encode())
+        self.wfile.write(("OK. Cycle %d and going." % CYCLE).encode())
         return
     
 class DispatcherService():
