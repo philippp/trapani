@@ -1,7 +1,7 @@
 from twilio.twiml.voice_response import VoiceResponse, Say
 from flask import Flask, request
 from twilio import twiml
-
+import crypto
 
 app = Flask(__name__)
 
@@ -20,11 +20,16 @@ def hello_world():
     response.say('It seems to be working! Whoopee!')
     return str(response)
 
-@app.route('/bridge', methods=['POST', 'GET'])
+@app.route('/dialpartner', methods=['POST', 'GET'])
 def bridge():
-    response = VoiceResponse()
-    response.say("Connecting, please wait.")
-    response.dial("+14152904810")
+    number = cryptmaster.decrypt_string(request.form['ptoken'])
+    if not (number[0] = '+' and len(number) == 11):
+        response = VoiceResponse()
+        response.say("Apologies, but please tell the team you ran into error #1")
+    else:
+        response = VoiceResponse()
+        response.say("Connecting, please wait.")
+        response.dial(number)
     return str(response)
 
 

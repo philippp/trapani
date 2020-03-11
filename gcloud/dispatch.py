@@ -57,6 +57,7 @@ def process_single_call(instance_id, database_id):
         if database.attempt_lock_call(
                 instance_id, database_id, call_uuid, processor_uuid):
             claimed_call_uuid = call_uuid
+            print("Worker dispatching %s" % claimed_text_uuid)
             break
     # Twilio to dial these numbers.
 
