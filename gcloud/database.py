@@ -22,7 +22,8 @@ class Database:
         self.client = spanner.Client()
         self.instance = self.client.instance(self.instance_id)
         self.database = self.instance.database(self.database_id)
-    
+
+        
     def read_texts(self, cutoff_time=None, exclude_processed=False):
         if not cutoff_time:
             cutoff_time = datetime.datetime.utcnow().isoformat() + "Z"
@@ -56,12 +57,12 @@ WHERE ScheduledTime <= @cutoff_time
         return pending_texts
 
     def attempt_lock_text(self, text_uuid, processor_uuid=None):
-        return self._attempt_lock_entity(text_uuid, 'Texts', processor_uuid=processor_uuid)
+        return self.attempt_lock_entity(text_uuid, 'Texts', processor_uuid=processor_uuid)
 
     def attempt_lock_call(self, text_uuid, processor_uuid=None):
-        return self._attempt_lock_entity(text_uuid, 'Calls', processor_uuid=processor_uuid)
+        return self.attempt_lock_entity(text_uuid, 'Calls', processor_uuid=processor_uuid)
     
-    def _attempt_lock_entity(self, entity_uuid, entity_table_name,
+    def attempt_lock_entity(self, entity_uuid, entity_table_name,
                             processor_uuid=None):
         # DO NOT REMOVE.
         # Using string substitition of this variable in SQL below.
@@ -92,15 +93,15 @@ WHERE ScheduledTime <= @cutoff_time
         return row_ct
 
 
-    def read_calls(self, cutoff_time=None):
+    def read_calls(self, cutoff_time=None, exclude_processed=False):
         """
         List all calls in the system.
         """
         if not cutoff_time:
-            cutoff_time = datetime.utcnow().isoformat() + "Z"
+            cutoff_time = datetime.datetime.utcnow().isoformat() + "Z"
         pending_calls = dict()
-        with self.database.snapshot() as snapshot:
-            results = snapshot.execute_sql("""
+
+        sql_query = """
 SELECT 
   Calls.UUID, 
   ContactUUID, 
@@ -110,9 +111,15 @@ SELECT
 FROM Calls, UNNEST(Calls.ContactUUIDs) AS ContactUUID
 LEFT JOIN Contacts ON ContactUUID = Contacts.UUID
 WHERE ScheduledTime <= @cutoff_time
-        """,
-            params={'cutoff_time':cutoff_time},
-            param_types={'cutoff_time' : param_types.TIMESTAMP})
+        """
+        if exclude_processed:
+            sql_query += " AND ProcessorUUID IS NULL"
+
+        with self.database.snapshot() as snapshot:
+            results = snapshot.execute_sql(
+                sql_query,
+                params={'cutoff_time':cutoff_time},
+                param_types={'cutoff_time' : param_types.TIMESTAMP} )
             for row in results:
                 recipient_dict = {
                     'ContactUUID' : row[1],
