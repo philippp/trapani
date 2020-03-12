@@ -155,13 +155,15 @@ if __name__ == '__main__':  # noqa: C901
     p.add_argument(
         '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
 
-    subparsers.add_parser('continuous', help=DispatcherService.continuous_dispatch.__doc__)
+    p = subparsers.add_parser('continuous', help=DispatcherService.continuous_dispatch.__doc__)
+    p.add_argument(
+        '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
 
     args = parser.parse_args()
     dispatch = DispatcherService(twilio_auth_token.twilio_account_sid,
                            twilio_auth_token.twilio_token,
                            twilio_auth_token.twilio_phone,
-                           args.dry_run
+                           getattr(args, 'dry_run', False)
     )
     if args.command == 'dispatch_one_text':
         dispatch.dispatch_one(itemtype="text")
