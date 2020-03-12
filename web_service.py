@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 from twilio.twiml.voice_response import VoiceResponse, Say
 from flask import Flask, request
 from twilio import twiml
 import crypto
+import pdb
 
 app = Flask(__name__)
 
@@ -22,8 +24,14 @@ def hello_world():
 
 @app.route('/dialpartner', methods=['POST', 'GET'])
 def bridge():
-    number = cryptmaster.decrypt_string(request.form['ptoken'])
-    if not (number[0] = '+' and len(number) == 11):
+    cryptmaster = crypto.Cryptmaster()
+    if request.method == "POST":
+        ptoken = request.form['ptoken']
+    else:
+        ptoken = request.args['ptoken']
+    b64_padded_ptoken = ptoken + "=" * (4 - len(ptoken) % 4)
+    number = cryptmaster.decrypt_string(b64_padded_ptoken.encode())
+    if not (number[0] == '+' and len(number) == 12):
         response = VoiceResponse()
         response.say("Apologies, but please tell the team you ran into error #1")
     else:
@@ -34,4 +42,4 @@ def bridge():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', port=8000)
