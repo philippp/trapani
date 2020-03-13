@@ -21,7 +21,6 @@ HTTP_REQUEST_PERIOD = 2  # 0.5 QPS
 CYCLE = 0
 
 TWILIO_WEB_DOMAIN = "35.223.137.150"
-TWILIO_WEB_PORT = "8000"
 
 #def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
 
@@ -104,9 +103,8 @@ class DispatcherService():
     def _twilio_call(self, target_number_list, call_template="alpha_20min"):
         encrypted_number = self.cryptmaster.encrypt_string(target_number_list[1]).decode()
         encrypted_number = encrypted_number.replace("=","")
-        url = "http://%s:%d/dialpartner?ptoken=%s&template=%s" % (
+        url = "http://%s/dialpartner?ptoken=%s&template=%s" % (
             TWILIO_WEB_DOMAIN,
-            int(TWILIO_WEB_PORT),
             encrypted_number,
             call_template)
 
@@ -117,6 +115,7 @@ class DispatcherService():
             r = self.client.calls.create(from_=self.client_phone_number,
                                          to=target_number_list[0],
                                          url=url)
+            a=1
                                      
     def continuous_dispatch(self):
         """

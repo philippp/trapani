@@ -205,6 +205,11 @@ WHERE ScheduledTime <= @cutoff_time
     
         recipient_uuid_list = list()
         record_type = param_types.Array(param_types.STRING)
+        # TODO - handle DST
+        dt = dateutil.parser.parse(schedule_datetime+"-07:00")
+        schedule_datetime = dt.astimezone(tz=datetime.timezone.utc).isoformat()[:19]+"Z"
+        print(schedule_datetime)
+        
         with self.database.snapshot() as snapshot:
             results = snapshot.execute_sql(
                 "SELECT UUID FROM Contacts WHERE PhoneNumber IN UNNEST(@contact_number_list)",
@@ -233,7 +238,7 @@ WHERE ScheduledTime <= @cutoff_time
         if engagement_uuid:
             columns.append("EngagementUUID")
             values.append(engagement_uuid)
-        with database.batch() as batch:
+        with self.database.batch() as batch:
             batch.insert(
                 table='Calls',
                 columns=columns,
