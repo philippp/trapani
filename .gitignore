@@ -6,3 +6,5 @@ keys/*
 */*/*.pyc
 __pycache__*
 */__pycache_*
+gcloud/cloud_sql_proxy
+test_add_cases.sh

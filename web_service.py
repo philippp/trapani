@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from twilio.twiml.voice_response import VoiceResponse, Say
-from flask import Flask, request
+from flask import Flask, request, Response
 from twilio import twiml
 import crypto
 import pdb
@@ -14,21 +14,18 @@ def sms():
     message_body = request.form['Body']
     resp = twiml.Response()
     resp.message('Hello {}, you said: {}'.format(number, message_body))
-    return str(resp)
+    return Response(str(response), mimetype='text/xml')
 
 @app.route('/hello_world', methods=['POST','GET'])
 def hello_world():
     response = VoiceResponse()
     response.say('It seems to be working! Whoopee!')
-    return str(response)
+    return Response(str(response), mimetype='text/xml')
 
 @app.route('/dialpartner', methods=['POST', 'GET'])
 def bridge():
     cryptmaster = crypto.Cryptmaster()
-    if request.method == "POST":
-        ptoken = request.form['ptoken']
-    else:
-        ptoken = request.args['ptoken']
+    ptoken = request.args['ptoken']
     b64_padded_ptoken = ptoken + "=" * (4 - len(ptoken) % 4)
     number = cryptmaster.decrypt_string(b64_padded_ptoken.encode())
     if not (number[0] == '+' and len(number) == 12):
@@ -38,8 +35,8 @@ def bridge():
         response = VoiceResponse()
         response.say("Connecting, please wait.")
         response.dial(number)
-    return str(response)
+    return Response(str(response), mimetype='text/xml')
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    app.run(host='0.0.0.0', port=8080)
