@@ -3,10 +3,10 @@ curl -sSO https://dl.google.com/cloudagents/add-monitoring-agent-repo.sh
 sudo bash add-monitoring-agent-repo.sh
 sudp rm add-monitoring-agent-repo.sh
 sudo apt-get update
-sudo apt-get install python3-pip stackdriver-agent iptables-persistent mysql-client
+sudo apt-get install -y python3-pip stackdriver-agent iptables-persistent mysql-client nginx
 sudo service stackdriver-agent start
 
-pip3 install --upgrade google-cloud-spanner google-cloud-pubsub twilio python-dateutil cryptography flask
+pip3 install --upgrade google-cloud-spanner google-cloud-pubsub twilio python-dateutil cryptography flask uwsgi
 
 echo "export GOOGLE_APPLICATION_CREDENTIALS=\"/home/philippp/keys/Trapani-9ff766720b9f.json\"" >> ~/.bashrc
 # systemd requires a temp directory that's usually set by X, but missing on headless clients.
