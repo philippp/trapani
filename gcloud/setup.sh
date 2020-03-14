@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 curl -sSO https://dl.google.com/cloudagents/add-monitoring-agent-repo.sh
 sudo bash add-monitoring-agent-repo.sh
-sudp rm add-monitoring-agent-repo.sh
+sudo rm add-monitoring-agent-repo.sh
 sudo apt-get update
 sudo apt-get install -y python3-pip stackdriver-agent iptables-persistent mysql-client nginx
 sudo service stackdriver-agent start
