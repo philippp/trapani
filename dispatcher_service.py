@@ -35,16 +35,20 @@ class ProofOfLifeHandler(http.server.BaseHTTPRequestHandler):
     
 class DispatcherService():
     
-    def __init__(self, account_sid, auth_token, client_phone_number, dry_run=False):
+    def __init__(self, account_sid, auth_token, client_phone_number, dry_run=False, prod=False):
         self.account_sid = account_sid
         self.auth_token = auth_token
         self.client = Client(account_sid, auth_token)
         self.client_phone_number = client_phone_number
         self.processor_id = processor_id = uuid.uuid4().int & (1<<64)-1
         self.dry_run = dry_run
+
         self.database = database.Database()
-        self.database.connect()
-        self.cryptmaster = crypto.Cryptmaster()
+        if prod:
+            self.database.connect(database.db_info['prod'])
+        else:
+            self.database.connect(database.db_info['dev'])
+            self.cryptmaster = crypto.Cryptmaster()
 
         server_address = ('0.0.0.0', 8000)
         self.httpd = http.server.HTTPServer(server_address, ProofOfLifeHandler)
@@ -70,6 +74,7 @@ class DispatcherService():
                     item_id,
                     db_item_table_name,
                     self.processor_id):
+                self.database.mysql_connection.commit()
                 claimed_item_id = item_id
                 print("Worker dispatching %s" % claimed_item_id)
         if claimed_item_id:
@@ -127,7 +132,8 @@ class DispatcherService():
             if self.dispatch_one(itemtype='call'):
                 print("Dispatched a call!")
             if CYCLE % CYCLE_LOG_N == 0:
-                print("Cycle %d" % CYCLE)            
+                print("Cycle %d" % CYCLE)
+
             for i in range(int(SLEEP_PERIOD_SECONDS / HTTP_REQUEST_PERIOD)):
                 self.httpd.handle_request()
             end_t = time.time()
