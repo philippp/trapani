@@ -8,7 +8,7 @@ import pdb
 app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
-def sms():
+def root():
     return Response(str("a=42"), mimetype='text/xml')
 
 

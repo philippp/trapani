@@ -6,7 +6,7 @@ sudo apt-get update
 sudo apt-get install -y python3-pip stackdriver-agent iptables-persistent mysql-client nginx
 sudo service stackdriver-agent start
 
-pip3 install --upgrade google-cloud-spanner google-cloud-pubsub twilio python-dateutil cryptography flask uwsgi
+sudo pip3 install --upgrade google-cloud-spanner google-cloud-pubsub twilio python-dateutil cryptography flask uwsgi mysql-connector-python
 
 echo "export GOOGLE_APPLICATION_CREDENTIALS=\"/home/philippp/keys/Trapani-9ff766720b9f.json\"" >> ~/.bashrc
 # systemd requires a temp directory that's usually set by X, but missing on headless clients.

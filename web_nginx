@@ -4,6 +4,6 @@ server {
 
     location / {
         include uwsgi_params;
-        uwsgi_pass unix:/home/philippp/trapani/wsgi.sock;
+        uwsgi_pass unix:/home/philippp/wsgi.sock;
     }
 }
