@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from gcloud import database
 from twilio.rest import Client
-from google.cloud import spanner
 from keys import twilio_auth_token
 import json
 import base64
@@ -13,8 +12,6 @@ import http.server
 import time
 import crypto
 
-SPANNER_INSTANCE_ID = "test-instance"
-SPANNER_DATABASE_ID = "phone_schedule"
 CYCLE_LOG_N = 10
 SLEEP_PERIOD_SECONDS = 10
 HTTP_REQUEST_PERIOD = 2  # 0.5 QPS
@@ -43,9 +40,9 @@ class DispatcherService():
         self.auth_token = auth_token
         self.client = Client(account_sid, auth_token)
         self.client_phone_number = client_phone_number
-        self.instance_uuid = base64.b64encode(uuid.uuid1().bytes)
+        self.processor_id = processor_id = uuid.uuid4().int & (1<<64)-1
         self.dry_run = dry_run
-        self.database = database.Database(SPANNER_INSTANCE_ID, SPANNER_DATABASE_ID)
+        self.database = database.Database()
         self.database.connect()
         self.cryptmaster = crypto.Cryptmaster()
 
@@ -59,29 +56,30 @@ class DispatcherService():
         """
         assert itemtype in ("text", "call")
         if itemtype == "text":
-            db_item_table_name = "Texts"
+            db_item_table_name = "texts"
             all_items = self.database.read_texts(exclude_processed = True)
         else:
-            db_item_table_name = "Calls"
+            db_item_table_name = "calls"
             all_items = self.database.read_calls(exclude_processed = True)
 
-        claimed_item_uuid = None
-        for item_uuid in all_items.keys():
-            if claimed_item_uuid:
+        claimed_item_id = None
+        for item_id in all_items.keys():
+            if claimed_item_id:
                 break
             if self.database.attempt_lock_entity(
-                    item_uuid,
+                    item_id,
                     db_item_table_name,
-                    self.instance_uuid):
-                claimed_item_uuid = item_uuid
-                print("Worker dispatching %s" % claimed_item_uuid)
-        if claimed_item_uuid:
+                    self.processor_id):
+                claimed_item_id = item_id
+                print("Worker dispatching %s" % claimed_item_id)
+        if claimed_item_id:
+            item = all_items[claimed_item_id]
             if itemtype == "text":
-                if self._twilio_send_text(all_items[claimed_item_uuid]['PhoneNumber'],
-                                          all_items[claimed_item_uuid]['Message']):
+                if self._twilio_send_text(item['phone_number'],
+                                          item['message']):
                     return True
             else:
-                phone_numbers = [r.get("PhoneNumber") for r in all_items[claimed_item_uuid]['recipients']]
+                phone_numbers = [item['contact_a_number'], item['contact_b_number']]
                 if self._twilio_call(phone_numbers):
                     return True
         return False
@@ -124,6 +122,12 @@ class DispatcherService():
         global CYCLE
         while True:
             start_t = time.time()
+            if self.dispatch_one(itemtype='text'):
+                print("Dispatched a text!")
+            if self.dispatch_one(itemtype='call'):
+                print("Dispatched a call!")
+            if CYCLE % CYCLE_LOG_N == 0:
+                print("Cycle %d" % CYCLE)            
             for i in range(int(SLEEP_PERIOD_SECONDS / HTTP_REQUEST_PERIOD)):
                 self.httpd.handle_request()
             end_t = time.time()
@@ -131,12 +135,6 @@ class DispatcherService():
             if remaining_sleep > 0:
                 time.sleep(remaining_sleep)
             CYCLE += 1
-            if self.dispatch_one(itemtype='text'):
-                print("Dispatched a text!")
-            if self.dispatch_one(itemtype='call'):
-                print("Dispatched a call!")
-            if CYCLE % CYCLE_LOG_N == 0:
-                print("Cycle %d" % CYCLE)
         
 if __name__ == '__main__':  # noqa: C901
     parser = argparse.ArgumentParser(

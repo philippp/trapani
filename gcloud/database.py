@@ -11,87 +11,85 @@ import uuid
 from google.cloud import spanner
 from google.cloud.spanner_v1 import param_types
 import dateutil.parser
+import mysql.connector
+import csv
 
+db_info = dict(
+    host='localhost',
+    user='root',
+    passwd='zDa1BKlkOpmmzg5n',
+    database='blindchat_dev',
+    port=3307
+)
+
+def execute(cursor, query, values=None):
+    return cursor.execute(query, values)
+    
 class Database:
-    def __init__(self, instance_id, database_id):
-        self.instance_id = instance_id
-        self.database_id = database_id
-        self.client = None
+
+    def __init__(self):
+        self.mysql_connection = None
 
     def connect(self):
-        self.client = spanner.Client()
-        self.instance = self.client.instance(self.instance_id)
-        self.database = self.instance.database(self.database_id)
+        try:
+            if self.mysql_connection:
+                self.mysql_connection.close()
+        except:
+            pass
+        self.mysql_connection = mysql.connector.connect(**db_info)
 
-        
     def read_texts(self, cutoff_time=None, exclude_processed=False):
         if not cutoff_time:
-            cutoff_time = datetime.datetime.utcnow().isoformat() + "Z"
+            cutoff_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
         sql_query = """
 SELECT 
-  Texts.UUID, 
-  ContactUUID, 
-  Contacts.Name,
-  Contacts.PhoneNumber,
-  Texts.Message
-FROM Texts
-LEFT JOIN Contacts ON ContactUUID = Contacts.UUID
-WHERE ScheduledTime <= @cutoff_time
+  texts.id as text_id, 
+  contact_id, 
+  contacts.name,
+  contacts.phone_number,
+  texts.message
+FROM texts
+LEFT JOIN contacts ON contact_id = contacts.id
+WHERE time_scheduled <= %s
         """
         if exclude_processed:
-            sql_query += " AND ProcessorUUID IS NULL"
+            sql_query += " AND processor_id IS NULL"
+
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(sql_query, (cutoff_time,))
+        records = cursor.fetchall()
         pending_texts = dict()
-        with self.database.snapshot() as snapshot:
-            results = snapshot.execute_sql(sql_query,
-                                           params={'cutoff_time':cutoff_time},
-                                           param_types={'cutoff_time' : param_types.TIMESTAMP})
-            for row in results:
-                pending_texts[row[0]] = {
-                    'UUID' : row[0],
-                    'ContactUUID' : row[1],
-                    'Name' : row[2],
-                    'PhoneNumber' : row[3],
-                    'Message' : row[4]
-                }
+        for row in records:
+            pending_texts[row[0]] = {
+                'id' : row[0],
+                'contact_id' : row[1],
+                'name' : row[2],
+                'phone_number' : row[3],
+                'message' : row[4]
+            }
         return pending_texts
-
-    def attempt_lock_text(self, text_uuid, processor_uuid=None):
-        return self.attempt_lock_entity(text_uuid, 'Texts', processor_uuid=processor_uuid)
-
-    def attempt_lock_call(self, text_uuid, processor_uuid=None):
-        return self.attempt_lock_entity(text_uuid, 'Calls', processor_uuid=processor_uuid)
     
-    def attempt_lock_entity(self, entity_uuid, entity_table_name,
-                            processor_uuid=None):
+    def attempt_lock_text(self, text_id, processor_id=None):
+        return self.attempt_lock_entity(text_id, 'texts', processor_id=processor_id)
+
+    def attempt_lock_call(self, text_id, processor_id=None):
+        return self.attempt_lock_entity(text_id, 'calls', processor_id=processor_id)
+    
+    def attempt_lock_entity(self, entity_id, entity_table_name,
+                            processor_id=None):
         # DO NOT REMOVE.
         # Using string substitition of this variable in SQL below.
-        assert entity_table_name in ("Texts", "Calls")
-        if not processor_uuid:
-            processor_uuid = base64.b64encode(uuid.uuid1().bytes)
+        assert entity_table_name in ("texts", "calls")
+        if not processor_id:
+            processor_id = uuid.uuid4().int & (1<<64)-1
 
-        params = {
-            'processor_uuid': processor_uuid,
-            'entity_uuid' : entity_uuid
-        }
-        param_type = {
-            'processor_uuid': param_types.BYTES,
-            'entity_uuid' : param_types.BYTES
-        }
-        def write_with_struct(transaction):
-            row_ct = transaction.execute_update(
-                ("UPDATE %s SET ProcessorUUID = @processor_uuid, "
-                 "ProcessStartTime = PENDING_COMMIT_TIMESTAMP()"
-                 "WHERE ProcessorUUID IS NULL AND UUID = @entity_uuid") % entity_table_name,
-                params=params,
-                param_types=param_type
-            )
-            print("{} record(s) updated.".format(row_ct))
-            return row_ct
-
-        row_ct = self.database.run_in_transaction(write_with_struct)
-        return row_ct
-
+        sql_query = ("UPDATE " + entity_table_name + " SET processor_id = %s, "
+                     "time_dispatcher_processed = CURRENT_TIMESTAMP()"
+               "WHERE processor_id IS NULL AND id = %s")
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(sql_query, (processor_id, entity_id))
+        return cursor.rowcount
 
     def read_calls(self, cutoff_time=None, exclude_processed=False):
         """
@@ -103,170 +101,119 @@ WHERE ScheduledTime <= @cutoff_time
 
         sql_query = """
 SELECT 
-  Calls.UUID, 
-  ContactUUID, 
-  Contacts.Name,
-  Contacts.PhoneNumber,
-  Calls.ScheduledTime
-FROM Calls, UNNEST(Calls.ContactUUIDs) AS ContactUUID
-LEFT JOIN Contacts ON ContactUUID = Contacts.UUID
-WHERE ScheduledTime <= @cutoff_time
+  calls.id, 
+  contact_a_id, 
+  contact_b_id, 
+  contacts_a.name as name_a,
+  contacts_b.name as name_b,
+  contacts_a.phone_number as number_a,
+  contacts_b.phone_number as number_b,
+  calls.time_scheduled
+FROM calls 
+LEFT JOIN contacts as contacts_a 
+ON calls.contact_a_id = contacts_a.id
+LEFT JOIN contacts as contacts_b
+ON calls.contact_b_id = contacts_b.id
+WHERE time_scheduled <= %s
         """
         if exclude_processed:
-            sql_query += " AND ProcessorUUID IS NULL"
+            sql_query += " AND processor_id IS NULL"
 
-        with self.database.snapshot() as snapshot:
-            results = snapshot.execute_sql(
-                sql_query,
-                params={'cutoff_time':cutoff_time},
-                param_types={'cutoff_time' : param_types.TIMESTAMP} )
-            for row in results:
-                recipient_dict = {
-                    'ContactUUID' : row[1],
-                    'Name' : row[2],
-                    'PhoneNumber' : row[3]
-                }
-                if row[0] not in pending_calls:
-                    pending_calls[row[0]] = {
-                        'UUID':row[0],
-                        'ScheduledTime':row[4],
-                        'recipients': [recipient_dict]
-                    }
-                else:
-                    pending_calls[row[0]]['recipients'].append(
-                        recipient_dict)
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(sql_query, (cutoff_time,))
+        records = cursor.fetchall()
+        pending_calls = dict()
+        for row in records:
+            pending_calls[row[0]] = {
+                'id' : row[0],
+                'contact_a_id' : row[1],
+                'contact_b_id' : row[2],
+                'contact_a_name' : row[3],
+                'contact_b_name' : row[4],
+                'contact_a_number' : row[5],
+                'contact_b_number' : row[6],
+                'time_scheduled' : row[7]
+            }
         return pending_calls
 
-
-    def add_contact(self, contact_name, contact_number):
-        """Inserts a new contact.
+    def add_contacts(self, contacts):
+        """Adds contacts.
+        Format is {'name':contact_name, 'number':contact_number}
         """
-        record_uuid = uuid.uuid1()
-    
-        with self.database.batch() as batch:
-            batch.insert(
-                table='Contacts',
-                columns=('UUID', 'Name', 'PhoneNumber','TimeCreated'),
-                values=[
-                    (
-                        base64.b64encode(record_uuid.bytes),
-                        contact_name,
-                        contact_number,
-                        spanner.COMMIT_TIMESTAMP
-                    )]) 
-        pass
+        cursor = self.mysql_connection.cursor()
+        insert_string = "INSERT INTO contacts (name, phone_number) " \
+            "VALUES (%s,%s)"
+        result = cursor.executemany(
+            insert_string,
+            [(c['name'], c['number']) for c in contacts])
 
-    def schedule_text(self, contact_number, message, schedule_datetime, engagement_uuid=None):
+    def schedule_text(self, contact_id, message, time_scheduled, engagement_id=0):
         """Schedules a text message.
         TODO: Validate and reformat datetime and phone #"""
         if len(message) > 160:
             # TODO - log failure
             raise Exception()
         # TODO - handle DST
-        dt = dateutil.parser.parse(schedule_datetime+"-07:00")
-        schedule_datetime = dt.astimezone(tz=datetime.timezone.utc).isoformat()[:19]+"Z"
-        print(schedule_datetime)
+        dt = dateutil.parser.parse(time_scheduled+"-07:00")
+        time_scheduled = dt.astimezone(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        print(time_scheduled)
 
-        # Look up the recipient
-        recipient_uuid = None
-        with self.database.snapshot() as snapshot:
-            results = snapshot.execute_sql(
-                "SELECT UUID FROM Contacts WHERE PhoneNumber = @contact_number",
-                params={'contact_number': contact_number},
-                param_types={'contact_number': param_types.STRING})
-            if not results:
-                print("Number does not exist")
-                raise Exception()
-            recipient_uuid = results.one()[0]
-        print(recipient_uuid)
-        # Schedule the message
-        record_uuid = uuid.uuid1()
-
-        columns = ["UUID", "ContactUUID", "Message", "TimeCreated", "ScheduledTime"]
-        values = [
-            base64.b64encode(record_uuid.bytes),
-            recipient_uuid,
-            message,
-            spanner.COMMIT_TIMESTAMP,
-            schedule_datetime
-        ]
-        if engagement_uuid:
-            columns.append("EngagementUUID")
-            values.append(engagement_uuid)
-        with self.database.batch() as batch:
-            batch.insert(
-                table='Texts',
-                columns=columns,
-                values=[values])
-        pass
-
-    def schedule_call(self, contact_number_list, schedule_datetime, engagement_uuid=None):
-        # Look up the recipients
-    
-        recipient_uuid_list = list()
-        record_type = param_types.Array(param_types.STRING)
-        # TODO - handle DST
-        dt = dateutil.parser.parse(schedule_datetime+"-07:00")
-        schedule_datetime = dt.astimezone(tz=datetime.timezone.utc).isoformat()[:19]+"Z"
-        print(schedule_datetime)
+        cursor = self.mysql_connection.cursor()
+        insert_string = "INSERT INTO texts (contact_id, message, time_scheduled, engagement_id) " \
+            "VALUES (%s,%s, %s, %s)"
         
-        with self.database.snapshot() as snapshot:
-            results = snapshot.execute_sql(
-                "SELECT UUID FROM Contacts WHERE PhoneNumber IN UNNEST(@contact_number_list)",
-                params={'contact_number_list': contact_number_list},
-                param_types={'contact_number_list': record_type})
-            if not results:
-                print("Number does not exist")
-                raise Exception()
-            for result in results:
-                recipient_uuid_list.append(result[0])
-            if not len(contact_number_list) == len(recipient_uuid_list):
-                print(contact_number_list, recipient_uuid_list)
-                raise Exception()
+        cursor.execute(insert_string, (contact_id, message, time_scheduled, engagement_id))
+        print("Added scheduled text #%d" % cursor.lastrowid)
 
-        # Schedule the call
-        # Schedule the message
-        record_uuid = uuid.uuid1()
+    def schedule_call(self, contact_a_id, contact_b_id, time_scheduled, engagement_id=0):
+        # TODO - handle DST
+        dt = dateutil.parser.parse(time_scheduled+"-07:00")
+        time_scheduled = dt.astimezone(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        print(time_scheduled)
 
-        columns = ["UUID", "ContactUUIDs", "TimeCreated", "ScheduledTime"]
+        insert_string = "INSERT INTO calls (contact_a_id, contact_b_id, time_scheduled, engagement_id) "\
+                        "VALUES (%s, %s, %s, %s)"
         values = [
-            base64.b64encode(record_uuid.bytes),
-            recipient_uuid_list,
-            spanner.COMMIT_TIMESTAMP,
-            schedule_datetime
+            contact_a_id,
+            contact_b_id,
+            time_scheduled,
+            engagement_id
         ]
-        if engagement_uuid:
-            columns.append("EngagementUUID")
-            values.append(engagement_uuid)
-        with self.database.batch() as batch:
-            batch.insert(
-                table='Calls',
-                columns=columns,
-                values=[values])
+        cursor = self.mysql_connection.cursor()        
+        cursor.execute(insert_string, values)
+        print("Added scheduled call #%d" % cursor.lastrowid)        
+        
     
 
+def contacts_dict_from_csv_file(contacts_csv_file):
+    contacts = list()
+    with open(contacts_csv_file) as csvfile:
+        contactsreader = csv.reader(csvfile)
+        for row in contactsreader:
+            contacts.append(
+                {
+                    'name':row[0],
+                    'number':row[1]
+                })
+    return contacts
+            
 if __name__ == '__main__':  # noqa: C901
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument(
-        '--instance_id', help='Your Cloud Spanner instance ID.', default="test-instance")
-    parser.add_argument(
-        '--database_id', help='Your Cloud Spanner database ID.', default="phone_schedule")
-
 
     subparsers = parser.add_subparsers(dest='command')
-    add_contact_parser = subparsers.add_parser('add_contact', help=Database.add_contact.__doc__)
-    add_contact_parser.add_argument('--name')
-    add_contact_parser.add_argument('--number')
+    add_contact_parser = subparsers.add_parser('add_contacts', help=Database.add_contacts.__doc__)
+    add_contact_parser.add_argument('--contacts_csv_file', help="CSV of name, number columns")
+
     schedule_text_parser = subparsers.add_parser('schedule_text', help=Database.schedule_text.__doc__)
     schedule_text_parser.add_argument('--message', help="Text message to send, 160 chars max.")
-    schedule_text_parser.add_argument('--number', help="Number in \"+1234567890\" format")
+    schedule_text_parser.add_argument('--user_id', help="User to schedule text for")
     schedule_text_parser.add_argument('--schedule_datetime', help="\"YYYY-MM-DDTHH:MM:SS\" In pacific time zone")
 
     schedule_call_parser = subparsers.add_parser('schedule_call', help=Database.schedule_call.__doc__)
-    schedule_call_parser.add_argument('--number_a')
-    schedule_call_parser.add_argument('--number_b')    
+    schedule_call_parser.add_argument('--contact_a_id')
+    schedule_call_parser.add_argument('--contact_b_id')
     schedule_call_parser.add_argument('--schedule_datetime')
     
     subparsers.add_parser('read_calls', help=Database.read_calls.__doc__)
@@ -275,18 +222,21 @@ if __name__ == '__main__':  # noqa: C901
     args = parser.parse_args()
 
     
-    db = Database(args.instance_id, args.database_id)
+    db = Database()
     db.connect()
     
-    if args.command == 'add_contact':
-        db.add_contact(args.name, args.number)
+    if args.command == 'add_contacts':
+        contacts_dict = contacts_dict_from_csv_file(args.contacts_csv_file)
+        db.add_contacts(contacts_dict)
+        db.mysql_connection.commit()
     elif args.command == 'read_calls':
         pprint.pprint(db.read_calls())
     elif args.command == 'read_texts':
         pprint.pprint(db.read_texts())
-        
     elif args.command == "schedule_text":
-        db.schedule_text(args.number, args.message, args.schedule_datetime)
+        db.schedule_text(args.user_id, args.message, args.schedule_datetime)
+        db.mysql_connection.commit()
     elif args.command == "schedule_call":
-        db.schedule_call([args.number_a, args.number_b], args.schedule_datetime)
-    #gcloud spanner instances create scheduler --config=regional-us-central1     --description="Scheduler Table" --nodes=1
+        db.schedule_call(args.contact_a_id, args.contact_b_id, args.schedule_datetime)
+        db.mysql_connection.commit()
+
