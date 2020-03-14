@@ -130,7 +130,7 @@ class DispatcherService():
                 print("Dispatched a call!")
             if CYCLE % CYCLE_LOG_N == 0:
                 print("Cycle %d" % CYCLE)
-                
+
             for i in range(int(SLEEP_PERIOD_SECONDS / HTTP_REQUEST_PERIOD)):
                 self.httpd.handle_request()
             end_t = time.time()
