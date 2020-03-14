@@ -8,18 +8,25 @@ import argparse
 import base64
 import datetime
 import uuid
-from google.cloud import spanner
-from google.cloud.spanner_v1 import param_types
 import dateutil.parser
 import mysql.connector
 import csv
 
 db_info = dict(
-    host='localhost',
-    user='root',
-    passwd='zDa1BKlkOpmmzg5n',
-    database='blindchat_dev',
-    port=3307
+    dev = dict(
+        host='localhost',
+        user='blindchat_dev',
+        passwd='u73hYgt!GHkn7!8E39',
+        database='blindchat_dev',
+        port=3307
+    ),
+    prod = dict(
+        host='localhost',
+        user='blindchat_prod',
+        passwd='Y5fR2)3_3bnGbKME21',
+        database='blindchat_prod',
+        port=3307
+    ),
 )
 
 def execute(cursor, query, values=None):
@@ -30,14 +37,19 @@ class Database:
     def __init__(self):
         self.mysql_connection = None
 
-    def connect(self):
+    def connect(self, config):
+        self.config = config
+        self.reconnect()
+
+    def reconnect(self):
         try:
             if self.mysql_connection:
                 self.mysql_connection.close()
         except:
             pass
-        self.mysql_connection = mysql.connector.connect(**db_info)
+        self.mysql_connection = mysql.connector.connect(**self.config)
 
+        
     def read_texts(self, cutoff_time=None, exclude_processed=False):
         if not cutoff_time:
             cutoff_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -59,6 +71,8 @@ WHERE time_scheduled <= %s
         cursor = self.mysql_connection.cursor()
         cursor.execute(sql_query, (cutoff_time,))
         records = cursor.fetchall()
+        self.mysql_connection.commit()
+        print(str(records))
         pending_texts = dict()
         for row in records:
             pending_texts[row[0]] = {
@@ -89,7 +103,9 @@ WHERE time_scheduled <= %s
                "WHERE processor_id IS NULL AND id = %s")
         cursor = self.mysql_connection.cursor()
         cursor.execute(sql_query, (processor_id, entity_id))
-        return cursor.rowcount
+        result = cursor.rowcount
+        self.mysql_connection.commit()
+        return result
 
     def read_calls(self, cutoff_time=None, exclude_processed=False):
         """
@@ -122,6 +138,7 @@ WHERE time_scheduled <= %s
         cursor = self.mysql_connection.cursor()
         cursor.execute(sql_query, (cutoff_time,))
         records = cursor.fetchall()
+        self.mysql_connection.commit()
         pending_calls = dict()
         for row in records:
             pending_calls[row[0]] = {
@@ -146,7 +163,8 @@ WHERE time_scheduled <= %s
         result = cursor.executemany(
             insert_string,
             [(c['name'], c['number']) for c in contacts])
-
+        self.mysql_connection.commit()
+        
     def schedule_text(self, contact_id, message, time_scheduled, engagement_id=0):
         """Schedules a text message.
         TODO: Validate and reformat datetime and phone #"""
@@ -163,6 +181,7 @@ WHERE time_scheduled <= %s
             "VALUES (%s,%s, %s, %s)"
         
         cursor.execute(insert_string, (contact_id, message, time_scheduled, engagement_id))
+        self.mysql_connection.commit()
         print("Added scheduled text #%d" % cursor.lastrowid)
 
     def schedule_call(self, contact_a_id, contact_b_id, time_scheduled, engagement_id=0):
@@ -181,6 +200,7 @@ WHERE time_scheduled <= %s
         ]
         cursor = self.mysql_connection.cursor()        
         cursor.execute(insert_string, values)
+        self.mysql_connection.commit()
         print("Added scheduled call #%d" % cursor.lastrowid)        
         
     
@@ -201,6 +221,7 @@ if __name__ == '__main__':  # noqa: C901
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--db_config', default="dev", help="dev or prod")
 
     subparsers = parser.add_subparsers(dest='command')
     add_contact_parser = subparsers.add_parser('add_contacts', help=Database.add_contacts.__doc__)
@@ -223,20 +244,19 @@ if __name__ == '__main__':  # noqa: C901
 
     
     db = Database()
-    db.connect()
+    db_config = db_info.get(args.db_config)
+    db.connect(db_config)
     
     if args.command == 'add_contacts':
         contacts_dict = contacts_dict_from_csv_file(args.contacts_csv_file)
         db.add_contacts(contacts_dict)
-        db.mysql_connection.commit()
     elif args.command == 'read_calls':
         pprint.pprint(db.read_calls())
     elif args.command == 'read_texts':
         pprint.pprint(db.read_texts())
     elif args.command == "schedule_text":
         db.schedule_text(args.user_id, args.message, args.schedule_datetime)
-        db.mysql_connection.commit()
     elif args.command == "schedule_call":
         db.schedule_call(args.contact_a_id, args.contact_b_id, args.schedule_datetime)
-        db.mysql_connection.commit()
+
 

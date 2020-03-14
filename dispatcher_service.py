@@ -35,15 +35,16 @@ class ProofOfLifeHandler(http.server.BaseHTTPRequestHandler):
     
 class DispatcherService():
     
-    def __init__(self, account_sid, auth_token, client_phone_number, dry_run=False):
+    def __init__(self, account_sid, auth_token, client_phone_number, dry_run=False, db_instance=False):
         self.account_sid = account_sid
         self.auth_token = auth_token
         self.client = Client(account_sid, auth_token)
         self.client_phone_number = client_phone_number
         self.processor_id = processor_id = uuid.uuid4().int & (1<<64)-1
         self.dry_run = dry_run
+
         self.database = database.Database()
-        self.database.connect()
+        self.database.connect(database.db_info[db_instance])
         self.cryptmaster = crypto.Cryptmaster()
 
         server_address = ('0.0.0.0', 8000)
@@ -70,6 +71,7 @@ class DispatcherService():
                     item_id,
                     db_item_table_name,
                     self.processor_id):
+                self.database.mysql_connection.commit()
                 claimed_item_id = item_id
                 print("Worker dispatching %s" % claimed_item_id)
         if claimed_item_id:
@@ -127,7 +129,8 @@ class DispatcherService():
             if self.dispatch_one(itemtype='call'):
                 print("Dispatched a call!")
             if CYCLE % CYCLE_LOG_N == 0:
-                print("Cycle %d" % CYCLE)            
+                print("Cycle %d" % CYCLE)
+                
             for i in range(int(SLEEP_PERIOD_SECONDS / HTTP_REQUEST_PERIOD)):
                 self.httpd.handle_request()
             end_t = time.time()
@@ -142,6 +145,8 @@ if __name__ == '__main__':  # noqa: C901
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         '--project_id', help='Your Project ID.', default="hazel-strand-270418")
+    parser.add_argument(
+        '--database', help='dev or prod database', default="dev")
     
     subparsers = parser.add_subparsers(dest='command')
     p = subparsers.add_parser('dispatch_one_text', help=DispatcherService.dispatch_one.__doc__)
@@ -157,10 +162,12 @@ if __name__ == '__main__':  # noqa: C901
         '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
 
     args = parser.parse_args()
-    dispatch = DispatcherService(twilio_auth_token.twilio_account_sid,
-                           twilio_auth_token.twilio_token,
-                           twilio_auth_token.twilio_phone,
-                           getattr(args, 'dry_run', False)
+    dispatch = DispatcherService(
+        twilio_auth_token.twilio_account_sid,
+        twilio_auth_token.twilio_token,
+        twilio_auth_token.twilio_phone,
+        dry_run = getattr(args, 'dry_run', False),
+        db_instance = args.database
     )
     if args.command == 'dispatch_one_text':
         dispatch.dispatch_one(itemtype="text")

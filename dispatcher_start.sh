@@ -3,7 +3,7 @@ if [ 1 ]
 then
 		if [ -z "`ps aux | grep dispatcher_service.py | grep -v grep`" ]
 		then
-				screen -d -m python3 ./dispatcher_service.py
+				screen -d -m python3 ./dispatcher_service.py --database prod
 		fi
 		if [ -z "`ps aux | grep cloud_sql_proxy | grep -v grep`" ]
 		then
