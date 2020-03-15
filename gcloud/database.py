@@ -49,7 +49,26 @@ class Database:
             pass
         self.mysql_connection = mysql.connector.connect(**self.config)
 
-        
+    def read_contacts_by_number(self, number_list):
+        sql_query = """
+SELECT
+  id,
+  name,
+  phone_number,
+  time_created
+FROM
+  contacts
+WHERE
+  phone_number IN (%s)
+""" % ",".join((['%s'] * len(number_list)))
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(sql_query, number_list)
+        records = cursor.fetchall()
+        self.mysql_connection.commit()
+        return [
+            dict(zip(('id', 'name', 'phone_number', 'time_created'),r)) for r in records
+            ]
+    
     def read_texts(self, cutoff_time=None, exclude_processed=False):
         if not cutoff_time:
             cutoff_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
@@ -198,12 +217,18 @@ WHERE time_scheduled <= %s
             time_scheduled,
             engagement_id
         ]
-        cursor = self.mysql_connection.cursor()        
+        cursor = self.mysql_connection.cursor()
         cursor.execute(insert_string, values)
         self.mysql_connection.commit()
         print("Added scheduled call #%d" % cursor.lastrowid)        
         
-    
+    def register_engagement(self, schedule_file_path, time_scheduled):
+        insert_string = "INSERT INTO engagements (schedule_file_path, time_scheduled) VALUES (%s, %s)"
+        values = [schedule_file_path, time_scheduled]
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(insert_string, values)
+        self.mysql_connection.commit()
+        return cursor.lastrowid
 
 def contacts_dict_from_csv_file(contacts_csv_file):
     contacts = list()

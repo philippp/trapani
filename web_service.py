@@ -20,8 +20,8 @@ def sms():
     resp.message('Hello {}, you said: {}'.format(number, message_body))
     return Response(str(response), mimetype='text/xml')
 
-@app.route('/hello_world', methods=['POST','GET'])
-def hello_world():
+@app.route('/call_reporting', methods=['POST','GET'])
+def call_reporting():
     response = VoiceResponse()
     response.say('It seems to be working! Whoopee!')
     return Response(str(response), mimetype='text/xml')
