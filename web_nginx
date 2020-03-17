@@ -1,9 +1,15 @@
 server {
-    listen 8080;
-    server_name twilio.blindchat.app;
+    listen 80  default_server;
 
     location / {
         include uwsgi_params;
         uwsgi_pass unix:/home/philippp/wsgi.sock;
     }
+
+    location /media/ {
+        alias /home/philippp/media;
+    }
+
+
+
 }

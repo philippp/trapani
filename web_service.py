@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET'])
 def root():
-    return Response(str("a=42"), mimetype='text/xml')
+    return Response(str("<html>a=42</html>"), mimetype='text/xml')
 
 
 @app.route('/sms', methods=['POST'])
@@ -20,11 +20,17 @@ def sms():
     resp.message('Hello {}, you said: {}'.format(number, message_body))
     return Response(str(response), mimetype='text/xml')
 
-@app.route('/call_reporting', methods=['POST','GET'])
-def call_reporting():
-    response = VoiceResponse()
-    response.say('It seems to be working! Whoopee!')
-    return Response(str(response), mimetype='text/xml')
+@app.route('/reporting/text/<text_id>', methods=['POST','GET'])
+def reporting_text(text_id):
+    number = request.form['From']
+    message_body = request.form['Body']
+    return Response(str("OK"), mimetype='text/xml')
+
+@app.route('/reporting/call/<call_id>', methods=['POST','GET'])
+def reporting_call(text_id):
+    number = request.form['From']
+    message_body = request.form['Body']
+    return Response(str("OK"), mimetype='text/xml')
 
 @app.route('/dialpartner', methods=['POST', 'GET'])
 def bridge():
@@ -37,7 +43,7 @@ def bridge():
         response.say("Apologies, but please tell the team you ran into error #1")
     else:
         response = VoiceResponse()
-        response.say("Connecting, please wait.")
+        response.play("http://35.223.137.150/media/welcome_please_wait.mp3")
         response.dial(number)
     return Response(str(response), mimetype='text/xml')
 
