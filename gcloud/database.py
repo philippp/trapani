@@ -255,12 +255,16 @@ if __name__ == '__main__':  # noqa: C901
     schedule_text_parser = subparsers.add_parser('schedule_text', help=Database.schedule_text.__doc__)
     schedule_text_parser.add_argument('--message', help="Text message to send, 160 chars max.")
     schedule_text_parser.add_argument('--user_id', help="User to schedule text for")
-    schedule_text_parser.add_argument('--schedule_datetime', help="\"YYYY-MM-DDTHH:MM:SS\" In pacific time zone")
+    schedule_text_parser.add_argument('--schedule_datetime',
+                                      help="\"YYYY-MM-DDTHH:MM:SS\" In pacific time zone",
+                                      default="2020-01-01T00:00:00")
 
     schedule_call_parser = subparsers.add_parser('schedule_call', help=Database.schedule_call.__doc__)
     schedule_call_parser.add_argument('--contact_a_id')
     schedule_call_parser.add_argument('--contact_b_id')
-    schedule_call_parser.add_argument('--schedule_datetime')
+    schedule_call_parser.add_argument('--schedule_datetime',
+                                      help="\"YYYY-MM-DDTHH:MM:SS\" In pacific time zone",
+                                      default="2020-01-01T00:00:00")
     
     subparsers.add_parser('read_calls', help=Database.read_calls.__doc__)
     subparsers.add_parser('read_texts', help=Database.read_texts.__doc__)    
