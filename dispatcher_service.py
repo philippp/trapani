@@ -19,7 +19,7 @@ CYCLE = 0
 
 TWILIO_WEB_DOMAIN = {
     'prod':"35.223.137.150",
-    'dev':"135.180.93.160"
+    'dev':"135.180.93.160:5000"
 }
 
 #def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
@@ -128,7 +128,12 @@ class DispatcherService():
                                          to=target_number_list[0],
                                          status_callback=callback_url,
                                          machine_detection='Enable',
-                                         url=url)
+                                         url=url) 
+            r2 = self.client.calls.create(from_=self.client_phone_number,
+                                          to=target_number_list[1],
+                                          status_callback=callback_url,
+                                          machine_detection='Enable',
+                                          url=url)           
             a=1
                                      
     def continuous_dispatch(self):
