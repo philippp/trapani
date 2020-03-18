@@ -7,7 +7,7 @@ server {
     }
 
     location /media/ {
-        alias /home/philippp/media;
+        alias /home/philippp/media/;
     }
 
 
