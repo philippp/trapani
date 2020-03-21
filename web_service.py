@@ -9,19 +9,6 @@ import scheduler
 
 ROOT_DOMAIN_DEV = "http://135.180.93.160:5000"
 ROOT_DOMAIN_PROD = "http://35.223.137.150"
-WARN_MESSAGE = "Apologies for the interruption! Your BlindChat will end in %d minutes."
-END_MESSAGE = "We hope you enjoyed your %d minute BlindChat - ending your call now."
-
-ANNOUNCEMENT_MESSAGES = {
-    1: {
-        message : WARN_MESSAGE % scheduler.WARN_BEFORE_END_MINUTES,
-        end_call : False
-    },
-    2: {
-        message : END_MESSAGE % scheduler.CALL_LENGTH_IN_MINUTES,
-        end_call : True
-    }
-}
 
 app = Flask(__name__)
 

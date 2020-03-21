@@ -2,6 +2,7 @@
 from gcloud import database
 from twilio.rest import Client
 from keys import twilio_auth_token
+from twilio.base import exceptions as twilio_exceptions
 import json
 import base64
 import uuid
@@ -14,13 +15,27 @@ import crypto
 import scheduler
 
 CYCLE_LOG_N = 10
-SLEEP_PERIOD_SECONDS = 10
+SLEEP_PERIOD_SECONDS = 2
 HTTP_REQUEST_PERIOD = 2  # 0.5 QPS
 CYCLE = 0
 
 TWILIO_WEB_DOMAIN = {
     'prod':"35.223.137.150",
     'dev':"135.180.93.160:5000"
+}
+
+WARN_MESSAGE = "Apologies for the interruption! Your BlindChat will end in %d minutes."
+END_MESSAGE = "We hope you enjoyed your %d minute BlindChat - ending your call now."
+
+ANNOUNCEMENT_MESSAGES = {
+    1: {
+        'message' : WARN_MESSAGE % scheduler.WARN_BEFORE_END_IN_MINUTES,
+        'end_call' : False
+    },
+    2: {
+        'message' : END_MESSAGE % scheduler.CALL_LENGTH_IN_MINUTES,
+        'end_call' : True
+    }
 }
 
 #def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
@@ -57,16 +72,20 @@ class DispatcherService():
         
     def dispatch_one(self, itemtype="text"):
         """
-        Dispatch one message and return.
+        Dispatch one action item and return.
+        Multiple workers/threads must be able to safely invoke this
+        concurrently.
         """
-        assert itemtype in ("text", "call")
+        assert itemtype in ("text", "call", "announcement")
         if itemtype == "text":
             db_item_table_name = "texts"
             all_items = self.database.read_texts(exclude_processed = True)
-        else:
+        elif itemtype == "call":
             db_item_table_name = "calls"
             all_items = self.database.read_calls(exclude_processed = True)
-
+        else:
+            db_item_table_name = "announcements"
+            all_items = self.database.read_announcements(exclude_processed = True)
         claimed_item_id = None
         for item_id in all_items.keys():
             if claimed_item_id:
@@ -86,7 +105,7 @@ class DispatcherService():
                         item['message'],
                         claimed_item_id):
                     return True
-            else:
+            elif itemtype == "call":
                 phone_numbers = [item['contact_a_number'], item['contact_b_number']]
                 call_sid_tuple = self._twilio_call(phone_numbers, claimed_item_id)
                 if call_sid_tuple and len(call_sid_tuple) == 2:
@@ -98,8 +117,29 @@ class DispatcherService():
                 else:
                     print("Failed to schedule announcements, call_sid_tuple was %s" % \
                           call_sid_tuple)
+            else:
+                # Announcement!
+                self._twilio_announcement(item['call_sid'], item['announcement_id'])
+
         return False
-    
+
+    def _twilio_announcement(self, call_sid, announcement_id):
+        # If we do not need to hang up after the announcement, this is an empty string.
+        hangup_str = ""
+        if ANNOUNCEMENT_MESSAGES[announcement_id]['end_call']:
+            hangup_str = "<Hangup/>"
+        twiml_response = "<Response><Say>%s</Say>%s</Response>" % (
+            ANNOUNCEMENT_MESSAGES[announcement_id]['message'],
+            hangup_str)
+        try:
+            print(twiml_response)
+            r = self.client.calls(call_sid).update(twiml=twiml_response)
+        except twilio_exceptions.TwilioRestException as e:
+            r = None
+            print(e)
+        print("Survived the exception")
+        return None
+        
     def _twilio_send_text(self, target_number, message, text_id):
         if self.dry_run:
             print("Dry run: Would have sent \"%s\" to %s" % (message, target_number))
@@ -189,6 +229,10 @@ if __name__ == '__main__':  # noqa: C901
     p.add_argument(
         '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
 
+    p = subparsers.add_parser('dispatch_one_announcement', help=DispatcherService.dispatch_one.__doc__)
+    p.add_argument(
+        '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
+    
     p = subparsers.add_parser('continuous', help=DispatcherService.continuous_dispatch.__doc__)
     p.add_argument(
         '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
@@ -206,5 +250,7 @@ if __name__ == '__main__':  # noqa: C901
         dispatch.dispatch_one(itemtype="text")
     elif args.command == 'dispatch_one_call':
         dispatch.dispatch_one(itemtype="call")
+    elif args.command == 'dispatch_one_announcement':
+        dispatch.dispatch_one(itemtype="announcement")        
     else:
         dispatch.continuous_dispatch()

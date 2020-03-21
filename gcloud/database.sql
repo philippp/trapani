@@ -43,6 +43,7 @@ CREATE TABLE announcements (
 	call_sid VARCHAR(68) NOT NULL,
 	announcement_id INT NOT NULL,
   time_scheduled TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  time_dispatcher_processed TIMESTAMP NULL DEFAULT NULL,	
   time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   processor_id BIGINT UNSIGNED,
   engagement_id INT,

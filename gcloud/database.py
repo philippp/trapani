@@ -115,7 +115,7 @@ WHERE time_scheduled <= %s
                             processor_id=None):
         # DO NOT REMOVE.
         # Using string substitition of this variable in SQL below.
-        assert entity_table_name in ("texts", "calls")
+        assert entity_table_name in ("texts", "calls", "announcements")
         if not processor_id:
             processor_id = uuid.uuid4().int & (1<<64)-1
 
@@ -220,6 +220,34 @@ VALUES (%s,%s, %s, %s)
         self.mysql_connection.commit()
         print("Added scheduled announcement #%d" % cursor.lastrowid)
 
+    def read_announcements(self, cutoff_time=None, exclude_processed=False):
+        if not cutoff_time:
+            cutoff_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+        sql_query = """
+SELECT 
+  id as announcement_id, 
+  call_sid, 
+  announcement_id
+FROM announcements
+WHERE time_scheduled <= %s
+        """
+        if exclude_processed:
+            sql_query += " AND processor_id IS NULL"
+
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(sql_query, (cutoff_time,))
+        records = cursor.fetchall()
+        self.mysql_connection.commit()
+        print(str(records))
+        pending_announcements = dict()
+        for row in records:
+            pending_announcements[row[0]] = {
+                'id' : row[0],
+                'call_sid' : row[1],
+                'announcement_id' : row[2],
+            }
+        return pending_announcements
         
     def schedule_call(self, contact_a_id, contact_b_id, time_scheduled, engagement_id=0):
         # TODO - handle DST

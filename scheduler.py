@@ -9,8 +9,8 @@ import datetime
 
 TEXT_BEFORE_CALL_IN_MINUTES = 10
 MESSAGE_TEMPLATE = "Your BlindChat with %s is starting in %d minutes - get cozy in a quiet spot! Consider breaking the ice by sharing your favorite travel memory."
-CALL_LENGTH_IN_MINUTES = 20
-WARN_BEFORE_END_IN_MINUTES = 5
+CALL_LENGTH_IN_MINUTES = 3  # 20
+WARN_BEFORE_END_IN_MINUTES = 2 # 5
 
 
 class Engagement:
