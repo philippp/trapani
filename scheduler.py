@@ -7,8 +7,11 @@ import re
 import datetime
 
 
-TEXT_BEFORE_CALL_IN_MINUTES = 15
-MESSAGE_TEMPLATE = """Your blindchat with %s is coming up in %d minutes. Find someplace cozy!"""
+TEXT_BEFORE_CALL_IN_MINUTES = 10
+MESSAGE_TEMPLATE = "Your BlindChat with %s is starting in %d minutes - get cozy in a quiet spot! Consider breaking the ice by sharing your favorite travel memory."
+CALL_LENGTH_IN_MINUTES = 20
+WARN_BEFORE_END_IN_MINUTES = 5
+
 
 class Engagement:
     def __init__(self, schedule_row, contact_a, contact_b):
@@ -114,7 +117,24 @@ def program_call(db, engagement, engagement_id):
                      engagement.contact_b_id,
                      engagement.time_call_scheduled,
                      engagement_id = engagement_id)
-    
+
+def program_call_announcements(db, call_sid, engagement_id):
+    """
+    Schedule the announcements for the call being placed. This function is called
+    from the processor when the call is placed. 
+    Currently the announcement will be attempted and fail if the party does not
+    pick up.
+    """
+    current_time = datetime.datetime.utcnow()
+    end_time = current_time + datetime.timedelta(
+        minutes=CALL_LENGTH_IN_MINUTES)
+    alert_time = current_time + datetime.timedelta(
+        minutes=CALL_LENGTH_IN_MINUTES-WARN_BEFORE_END_IN_MINUTES)
+    db.schedule_announcement(
+        call_sid, 1, alert_time.strftime("%Y-%m-%d %H:%M:%S"), engagement_id)
+    db.schedule_announcement(
+        call_sid, 2, end_time.strftime("%Y-%m-%d %H:%M:%S"), engagement_id)    
+
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser(
         description=__doc__,

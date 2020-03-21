@@ -11,6 +11,7 @@ import time
 import http.server
 import time
 import crypto
+import scheduler
 
 CYCLE_LOG_N = 10
 SLEEP_PERIOD_SECONDS = 10
@@ -87,10 +88,18 @@ class DispatcherService():
                     return True
             else:
                 phone_numbers = [item['contact_a_number'], item['contact_b_number']]
-                if self._twilio_call(phone_numbers, claimed_item_id):
+                call_sid_tuple = self._twilio_call(phone_numbers, claimed_item_id)
+                if call_sid_tuple and len(call_sid_tuple) == 2:
+                    scheduler.program_call_announcements(
+                        self.database, call_sid_tuple[0], item['engagement_id'])
+                    scheduler.program_call_announcements(
+                        self.database, call_sid_tuple[1], item['engagement_id'])
                     return True
+                else:
+                    print("Failed to schedule announcements, call_sid_tuple was %s" % \
+                          call_sid_tuple)
         return False
-                        
+    
     def _twilio_send_text(self, target_number, message, text_id):
         if self.dry_run:
             print("Dry run: Would have sent \"%s\" to %s" % (message, target_number))
@@ -123,6 +132,7 @@ class DispatcherService():
         if self.dry_run:
             print("Dry run: Would have called %s with call template %s and url %s" %\
                   (target_number_list, call_template, url))
+            return ("fake_test_sid_1", "fake_test_sid_2")
         else:
             r = self.client.calls.create(from_=self.client_phone_number,
                                          to=target_number_list[0],
@@ -133,8 +143,9 @@ class DispatcherService():
                                           to=target_number_list[1],
                                           status_callback=callback_url,
                                           machine_detection='Enable',
-                                          url=url)           
-            a=1
+                                          url=url)
+            # TODO: return sid tuple (it's in r)
+            return (r.sid, r2.sid)
                                      
     def continuous_dispatch(self):
         """

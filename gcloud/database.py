@@ -79,7 +79,8 @@ SELECT
   contact_id, 
   contacts.name,
   contacts.phone_number,
-  texts.message
+  texts.message,
+  texts.engagement_id
 FROM texts
 LEFT JOIN contacts ON contact_id = contacts.id
 WHERE time_scheduled <= %s
@@ -99,7 +100,8 @@ WHERE time_scheduled <= %s
                 'contact_id' : row[1],
                 'name' : row[2],
                 'phone_number' : row[3],
-                'message' : row[4]
+                'message' : row[4],
+                'engagement_id' : row[5]
             }
         return pending_texts
     
@@ -143,7 +145,8 @@ SELECT
   contacts_b.name as name_b,
   contacts_a.phone_number as number_a,
   contacts_b.phone_number as number_b,
-  calls.time_scheduled
+  calls.time_scheduled,
+  calls.engagement_id
 FROM calls 
 LEFT JOIN contacts as contacts_a 
 ON calls.contact_a_id = contacts_a.id
@@ -168,7 +171,8 @@ WHERE time_scheduled <= %s
                 'contact_b_name' : row[4],
                 'contact_a_number' : row[5],
                 'contact_b_number' : row[6],
-                'time_scheduled' : row[7]
+                'time_scheduled' : row[7],
+                'engagement_id' : row[8]
             }
         return pending_calls
 
@@ -203,6 +207,20 @@ WHERE time_scheduled <= %s
         self.mysql_connection.commit()
         print("Added scheduled text #%d" % cursor.lastrowid)
 
+    def schedule_announcement(self, call_sid, announcement_id, time_scheduled_utc, engagement_id=0):
+        """Schedules a text message.
+        TODO: Validate and reformat datetime and phone #"""
+        insert_string = """
+INSERT INTO announcements (
+call_sid, announcement_id, time_scheduled, engagement_id)
+VALUES (%s,%s, %s, %s)
+"""
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(insert_string, (call_sid, announcement_id, time_scheduled_utc, engagement_id))
+        self.mysql_connection.commit()
+        print("Added scheduled announcement #%d" % cursor.lastrowid)
+
+        
     def schedule_call(self, contact_a_id, contact_b_id, time_scheduled, engagement_id=0):
         # TODO - handle DST
         dt = dateutil.parser.parse(time_scheduled+"-07:00")

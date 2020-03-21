@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS calls;
 DROP TABLE IF EXISTS contacts;
 DROP TABLE IF EXISTS texts;
 DROP TABLE IF EXISTS engagements;
+DROP TABLE IF EXISTS announcements;
 
 CREATE TABLE calls (
   time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,	
@@ -30,11 +31,23 @@ CREATE TABLE texts (
   message VARCHAR(160) NOT NULL,
   time_dispatcher_processed TIMESTAMP NULL DEFAULT NULL,
   time_scheduled TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  text_status_detail VARCHAR(1024),
-  text_status INT,
+  event_status_detail VARCHAR(1024),
+  event_status INT,
   processor_id BIGINT UNSIGNED,
   engagement_id INT,
   time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE announcements (
+  id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+	call_sid VARCHAR(68) NOT NULL,
+	announcement_id INT NOT NULL,
+  time_scheduled TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  processor_id BIGINT UNSIGNED,
+  engagement_id INT,
+	event_status INT,
+	event_status_detail VARCHAR(1024)
 );
 
 CREATE TABLE engagements (
