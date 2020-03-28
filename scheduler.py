@@ -10,9 +10,9 @@ import pdb
 TEXT_BEFORE_CALL_IN_MINUTES = 10
 
 MESSAGE_TEMPLATES = {
-    1: """Your blindchat with %s is coming up in %d minutes. Get cozy in a quiet spot! Consider breaking the ice by sharing your favorite travel memory.""",
-    2: """Your second blindchat with %s is coming up in %d minutes. Reflect on your last conversation, and enjoy!""",
-    3: """Your third blindchat with %s is coming up in %d minutes. Reflect on your last conversation, and enjoy!""",
+    1: """Your BlindChat with %s is coming up in %d minutes. Get cozy in a quiet spot! Consider breaking the ice by sharing your favorite travel memory.""",
+    2: """Your 2nd BlindChat with %s is starting in %d minutes. Grab a quiet spot and think about this icebreaker: For what in your life do you feel most grateful?""",
+    3: """Your 3rd BlindChat with %s is coming up in %d minutes. Grab a quiet spot and ponder this icebreaker: What's your biggest fear?""",
     4: """Wow, seems like you and %s are really hitting it off! Your next BlindChat is in %d minutes. Reflect on your last conversation, and enjoy!"""    
     
 }

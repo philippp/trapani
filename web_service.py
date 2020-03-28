@@ -51,7 +51,7 @@ def bridge():
     print(answeredBy)
     b64_padded_ptoken = ptoken + "=" * (4 - len(ptoken) % 4)
     response = VoiceResponse()
-    if answeredBy == "human":
+    if answeredBy in ("human", "unknown"):
         response.play("%s/media/welcome_please_wait.mp3" % ROOT_DOMAIN_PROD, action="/dialstatus")
         dial = Dial()
         dial.conference(ptoken,
