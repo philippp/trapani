@@ -45,7 +45,6 @@ def dialstatus():
 
 @app.route('/dialpartner', methods=['POST', 'GET'])
 def bridge():
-    cryptmaster = crypto.Cryptmaster()
     ptoken = request.args['ptoken']
     pprint.pprint(request.form)
     answeredBy = request.args.get('AnsweredBy') or request.form.get('AnsweredBy')
@@ -55,7 +54,9 @@ def bridge():
     if answeredBy == "human":
         response.play("%s/media/welcome_please_wait.mp3" % ROOT_DOMAIN_PROD, action="/dialstatus")
         dial = Dial()
-        dial.conference(ptoken)
+        dial.conference(ptoken,
+                        waitUrl="%s/media/ttv_hold_music.mp3" % ROOT_DOMAIN_PROD,
+                        waitMethod="GET")
         response.append(dial)
     else:
         response.hangup()

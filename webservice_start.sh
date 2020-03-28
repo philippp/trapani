@@ -3,9 +3,8 @@ if [ 1 ]
 then
 		if [ -z "`ps aux | grep uwsgi | grep -v grep`" ]
 		then
-				screen -d -m uwsgi --ini web_wsgi.ini
+				screen -d -m sudo uwsgi --ini web_wsgi.ini --uid=philippp --gid=www-data
 				sleep 20
-				sudo chown philippp:www-data wsgi.sock
 		fi
 		sleep 10
 fi

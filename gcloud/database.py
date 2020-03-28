@@ -92,13 +92,10 @@ LEFT JOIN contacts ON contact_id = contacts.id
             sql_query += ("AND".join(clauses))
                 
         cursor = self.mysql_connection.cursor()
-        print(sql_query)
-        print(sql_query_params)
         
         cursor.execute(sql_query, sql_query_params)
         records = cursor.fetchall()
         self.mysql_connection.commit()
-        print(str(records))
         pending_texts = dict()
         for row in records:
             pending_texts[row[0]] = {
@@ -217,8 +214,6 @@ ON calls.contact_b_id = contacts_b.id
         # TODO - handle DST
         dt = dateutil.parser.parse(time_scheduled+"-07:00")
         time_scheduled = dt.astimezone(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        print(time_scheduled)
-
         cursor = self.mysql_connection.cursor()
         insert_string = "INSERT INTO texts (contact_id, message, time_scheduled, engagement_id) " \
             "VALUES (%s,%s, %s, %s)"
@@ -231,8 +226,6 @@ ON calls.contact_b_id = contacts_b.id
         # TODO - handle DST
         dt = dateutil.parser.parse(time_scheduled+"-07:00")
         time_scheduled = dt.astimezone(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        print(time_scheduled)
-
         insert_string = "INSERT INTO calls (contact_a_id, contact_b_id, time_scheduled, engagement_id) "\
                         "VALUES (%s, %s, %s, %s)"
         values = [
