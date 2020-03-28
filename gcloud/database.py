@@ -70,9 +70,6 @@ WHERE
             ]
     
     def read_texts(self, cutoff_time=None, exclude_processed=False):
-        if not cutoff_time:
-            cutoff_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-
         sql_query = """
 SELECT 
   texts.id as text_id, 
@@ -82,13 +79,23 @@ SELECT
   texts.message
 FROM texts
 LEFT JOIN contacts ON contact_id = contacts.id
-WHERE time_scheduled <= %s
-        """
-        if exclude_processed:
-            sql_query += " AND processor_id IS NULL"
-
+"""
+        sql_query_params = []
+        if cutoff_time or exclude_processed:
+            sql_query += " WHERE "
+            clauses = []
+            if cutoff_time:
+                clauses.append(" time_scheduled <= %s ")
+                sql_query_params.append(cutoff_time)
+            if exclude_processed:
+                clauses.append(" processor_id IS NULL ")
+            sql_query += ("AND".join(clauses))
+                
         cursor = self.mysql_connection.cursor()
-        cursor.execute(sql_query, (cutoff_time,))
+        print(sql_query)
+        print(sql_query_params)
+        
+        cursor.execute(sql_query, sql_query_params)
         records = cursor.fetchall()
         self.mysql_connection.commit()
         print(str(records))
@@ -126,14 +133,16 @@ WHERE time_scheduled <= %s
         self.mysql_connection.commit()
         return result
 
-    def read_calls(self, cutoff_time=None, exclude_processed=False):
+    def read_calls(self, cutoff_time=None, exclude_processed=False,
+                   caller_numbers=None):
         """
         List all calls in the system.
+        cutoff_time: If specified, only read calls scheduled before this time.
+        exclude_processed: If specified, only read unprocessed calls.
+        caller_numbers (tuple): If specified, only read calls between these numbers.
         """
-        if not cutoff_time:
-            cutoff_time = datetime.datetime.utcnow().isoformat() + "Z"
         pending_calls = dict()
-
+        sql_query_params = []
         sql_query = """
 SELECT 
   calls.id, 
@@ -143,19 +152,33 @@ SELECT
   contacts_b.name as name_b,
   contacts_a.phone_number as number_a,
   contacts_b.phone_number as number_b,
-  calls.time_scheduled
+  calls.time_scheduled,
+  calls.time_dispatcher_processed
 FROM calls 
 LEFT JOIN contacts as contacts_a 
 ON calls.contact_a_id = contacts_a.id
 LEFT JOIN contacts as contacts_b
 ON calls.contact_b_id = contacts_b.id
-WHERE time_scheduled <= %s
-        """
-        if exclude_processed:
-            sql_query += " AND processor_id IS NULL"
-
+"""
+        if cutoff_time or exclude_processed or caller_numbers:
+            sql_query += " WHERE "
+            clauses = []
+            if exclude_processed:
+                clauses.append(" processor_id IS NULL ")
+            if caller_numbers and len(caller_numbers) == 2:
+                clauses.append(""" (
+                (contacts_a.phone_number = %s AND contacts_b.phone_number = %s) OR
+                (contacts_b.phone_number = %s AND contacts_a.phone_number = %s))
+                """)
+                for number in list(caller_numbers) * 2:
+                    sql_query_params.append(number)
+            if cutoff_time:
+                clauses.append(" time_scheduled <= %s")
+                sql_query_params.append(cutoff_time)
+            sql_query += " AND ".join(clauses)
+            
         cursor = self.mysql_connection.cursor()
-        cursor.execute(sql_query, (cutoff_time,))
+        cursor.execute(sql_query, tuple(sql_query_params))
         records = cursor.fetchall()
         self.mysql_connection.commit()
         pending_calls = dict()
@@ -168,20 +191,21 @@ WHERE time_scheduled <= %s
                 'contact_b_name' : row[4],
                 'contact_a_number' : row[5],
                 'contact_b_number' : row[6],
-                'time_scheduled' : row[7]
+                'time_scheduled' : row[7],
+                'time_dispatcher_processed' : row[8]
             }
         return pending_calls
 
     def add_contacts(self, contacts):
         """Adds contacts.
-        Format is {'name':contact_name, 'number':contact_number}
+        Format is {'name':contact_name, 'phone_number':contact_number}
         """
         cursor = self.mysql_connection.cursor()
         insert_string = "INSERT INTO contacts (name, phone_number) " \
             "VALUES (%s,%s)"
         result = cursor.executemany(
             insert_string,
-            [(c['name'], c['number']) for c in contacts])
+            [(c['name'], c['phone_number']) for c in contacts])
         self.mysql_connection.commit()
         
     def schedule_text(self, contact_id, message, time_scheduled, engagement_id=0):
@@ -222,14 +246,14 @@ WHERE time_scheduled <= %s
         self.mysql_connection.commit()
         print("Added scheduled call #%d" % cursor.lastrowid)        
         
-    def register_engagement(self, schedule_file_path, time_scheduled):
-        insert_string = "INSERT INTO engagements (schedule_file_path, time_scheduled) VALUES (%s, %s)"
-        values = [schedule_file_path, time_scheduled]
+    def register_engagement(self, schedule_file_path, time_scheduled, engagement_number=1):
+        insert_string = "INSERT INTO engagements (schedule_file_path, time_scheduled, engagement_number) VALUES (%s, %s, %s)"
+        values = [schedule_file_path, time_scheduled, engagement_number]
         cursor = self.mysql_connection.cursor()
         cursor.execute(insert_string, values)
         self.mysql_connection.commit()
         return cursor.lastrowid
-
+        
 def contacts_dict_from_csv_file(contacts_csv_file):
     contacts = list()
     with open(contacts_csv_file) as csvfile:

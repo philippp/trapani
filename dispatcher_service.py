@@ -11,6 +11,7 @@ import time
 import http.server
 import time
 import crypto
+import datetime
 
 CYCLE_LOG_N = 10
 SLEEP_PERIOD_SECONDS = 10
@@ -59,12 +60,15 @@ class DispatcherService():
         Dispatch one message and return.
         """
         assert itemtype in ("text", "call")
+        cutoff_time = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         if itemtype == "text":
             db_item_table_name = "texts"
-            all_items = self.database.read_texts(exclude_processed = True)
+            all_items = self.database.read_texts(exclude_processed = True,
+                                                 cutoff_time = cutoff_time)
         else:
             db_item_table_name = "calls"
-            all_items = self.database.read_calls(exclude_processed = True)
+            all_items = self.database.read_calls(exclude_processed = True,
+                                                 cutoff_time = cutoff_time)
 
         claimed_item_id = None
         for item_id in all_items.keys():

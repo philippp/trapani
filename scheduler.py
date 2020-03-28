@@ -5,17 +5,22 @@ from gcloud import database
 import argparse
 import re
 import datetime
+import pprint
+import pdb
+TEXT_BEFORE_CALL_IN_MINUTES = 10
 
-
-TEXT_BEFORE_CALL_IN_MINUTES = 15
-MESSAGE_TEMPLATE = """Your blindchat with %s is coming up in %d minutes. Find someplace cozy!"""
+MESSAGE_TEMPLATES = {
+    1: """Your blindchat with %s is coming up in %d minutes. Get cozy in a quiet spot! Consider breaking the ice by sharing your favorite travel memory.""",
+    2: """Your second blindchat with %s is coming up in %d minutes. Reflect on your last conversation, and enjoy!""",
+    3: """Your third blindchat with %s is coming up in %d minutes. Reflect on your last conversation, and enjoy!""",
+    4: """Wow, seems like you and %s are really hitting it off! Your next BlindChat is in %d minutes. Reflect on your last conversation, and enjoy!"""    
+    
+}
 
 class Engagement:
     def __init__(self, schedule_row, contact_a, contact_b):
-        self.contact_a_id = contact_a['id']
-        self.contact_b_id = contact_b['id']
-        self.contact_a_name = contact_a['name']
-        self.contact_b_name = contact_b['name']
+        self.contact_a = contact_a
+        self.contact_b = contact_b
         self.time_call_scheduled = schedule_row[4]+"T"+schedule_row[5]
         
 def format_phone_number(input_number):
@@ -42,8 +47,6 @@ def program_schedule(db, schedule_file_path):
                     row[4] == 'Date YYYY-MM-DD' and
                     row[5] == 'Time (PST) HH:MM')
                 continue
-            print(row[5])
-            print("%s %s" % (row[5][3], len(row[5])))
             assert ((row[4][4] == row[4][7] == '-') and len(row[4]) == 10)
             assert ((row[5][2] == ':') and len(row[5]) == 5)
             number_a = format_phone_number(row[1])
@@ -53,6 +56,7 @@ def program_schedule(db, schedule_file_path):
             row_formatted[3] = number_b
             engagement_schedule.append(row_formatted)
         contact_map = get_or_create_contact_map(db, engagement_schedule)
+        
         for schedule_row in engagement_schedule:
             engagement = Engagement(schedule_row,
                                     contact_map[schedule_row[1]],
@@ -76,13 +80,13 @@ def get_or_create_contact_map(db, engagement_schedule):
                 numbers_to_add.add(r[1])
                 contacts_to_add.append({
                     'name': r[0],
-                    'number':r[1]})
+                    'phone_number':r[1]})
 
             if (r[3] not in contact_map.keys()) and r[3] not in numbers_to_add:
                 numbers_to_add.add(r[3])                
                 contacts_to_add.append({
                     'name': r[2],
-                    'number':r[3]})
+                    'phone_number':r[3]})
         db.add_contacts(contacts_to_add)
         for contact in db.read_contacts_by_number(list(engagement_numbers)):
             contact_map[contact['phone_number']] = contact       
@@ -90,28 +94,46 @@ def get_or_create_contact_map(db, engagement_schedule):
 
 def program_engagement(db, engagement, schedule_file_path):
     # Add engagement to DB
-    engagement_id = db.register_engagement(schedule_file_path, engagement.time_call_scheduled)
-    program_texts(db, engagement, engagement_id)
+    # Avoid duplicate engagements and recognize follow-on engagements
+    # by checking existing calls between the two.
+
+    existing_calls = db.read_calls(caller_numbers = [engagement.contact_a['phone_number'],
+                                                     engagement.contact_b['phone_number']])
+
+    dt = dateutil.parser.parse(engagement.time_call_scheduled+"-07:00")
+    new_engagement_time_scheduled = dt.astimezone(
+        tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    
+    print("Evaluating engagement to be scheduled for %s" % new_engagement_time_scheduled)
+    for existing_call in existing_calls.values():
+        if existing_call['time_scheduled'].strftime("%Y-%m-%d %H:%M:%S") == new_engagement_time_scheduled:
+            print("Would have been a dupe, skipping.")
+            return
+    engagement_number = len(existing_calls) + 1
+            
+    engagement_id = db.register_engagement(schedule_file_path, engagement.time_call_scheduled, engagement_number)
+    program_texts(db, engagement, engagement_id, engagement_number)
     program_call(db, engagement, engagement_id)
 
-def program_texts(db, engagement, engagement_id):
+def program_texts(db, engagement, engagement_id, engagement_number):
     dt_call = dateutil.parser.parse(engagement.time_call_scheduled+"-07:00")
     dt_text = dt_call - datetime.timedelta(minutes=TEXT_BEFORE_CALL_IN_MINUTES)
     datestring_text = dt_text.strftime("%Y-%m-%dT%H:%M:%S")
     print("Scheduling texts at %s (call will be at %s)" % (datestring_text, engagement.time_call_scheduled))
-    db.schedule_text(engagement.contact_a_id,
-                     MESSAGE_TEMPLATE % (engagement.contact_b_name,
+    engagement_number = min(engagement_number, max(MESSAGE_TEMPLATES.keys()))
+    db.schedule_text(engagement.contact_a['id'],
+                     MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_b['name'],
                                          TEXT_BEFORE_CALL_IN_MINUTES),
                      datestring_text)
-    db.schedule_text(engagement.contact_b_id,
-                     MESSAGE_TEMPLATE % (engagement.contact_a_name,
+    db.schedule_text(engagement.contact_b['id'],
+                     MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_a['name'],
                                          TEXT_BEFORE_CALL_IN_MINUTES),
                      datestring_text,
                      engagement_id = engagement_id)
 
 def program_call(db, engagement, engagement_id):
-    db.schedule_call(engagement.contact_a_id,
-                     engagement.contact_b_id,
+    db.schedule_call(engagement.contact_a['id'],
+                     engagement.contact_b['id'],
                      engagement.time_call_scheduled,
                      engagement_id = engagement_id)
     
