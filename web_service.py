@@ -5,9 +5,7 @@ from twilio import twiml
 import crypto
 import pdb
 import pprint
-
-ROOT_DOMAIN_DEV = "http://135.180.93.160:5000"
-ROOT_DOMAIN_PROD = "http://35.223.137.150"
+import config
 
 app = Flask(__name__)
 
@@ -27,11 +25,15 @@ def sms():
 @app.route('/reporting/text/<text_id>', methods=['POST','GET'])
 def reporting_text(text_id=0):
     message_body = request.form.get('Body')
+    pprint.pprint(message_body)
+    pdb.set_trace()    
     return Response(str("OK"), mimetype='text/xml')
 
 @app.route('/reporting/call/<call_id>', methods=['POST','GET'])
 def reporting_call(call_id=0):
     message_body = request.form.get('Body')
+    pprint.pprint(message_body)
+    pdb.set_trace()
     return Response(str("OK"), mimetype='text/xml')
 
 @app.route('/dialstatus', methods=['POST','GET'])
@@ -52,10 +54,10 @@ def bridge():
     b64_padded_ptoken = ptoken + "=" * (4 - len(ptoken) % 4)
     response = VoiceResponse()
     if answeredBy in ("human", "unknown"):
-        response.play("%s/media/welcome_please_wait.mp3" % ROOT_DOMAIN_PROD, action="/dialstatus")
+        response.play("%s/media/welcome_please_wait.mp3" % config.WEB_DOMAIN_PROD, action="/dialstatus")
         dial = Dial()
         dial.conference(ptoken,
-                        waitUrl="%s/media/ttv_hold_music.mp3" % ROOT_DOMAIN_PROD,
+                        waitUrl="%s/media/ttv_hold_music.mp3" % config.WEB_DOMAIN_PROD,
                         waitMethod="GET")
         response.append(dial)
     else:
@@ -64,9 +66,9 @@ def bridge():
 
 
 if __name__ == '__main__':
-    global ROOT_DOMAIN
-    ROOT_DOMAIN = ROOT_DOMAIN_DEV
+    global WEB_DOMAIN
+    WEB_DOMAIN = config.WEB_DOMAIN_DEV
     app.run(host='0.0.0.0', port=5000)
 else:
-    global ROOT_DOMAIN
-    ROOT_DOMAIN = ROOT_DOMAIN_PROD
+    global WEB_DOMAIN
+    WEB_DOMAIN = config.WEB_DOMAIN_PROD
