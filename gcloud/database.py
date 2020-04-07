@@ -41,6 +41,15 @@ class Database:
         self.config = config
         self.reconnect()
 
+
+    def close(self):
+        try:
+            if self.mysql_connection:
+                self.mysql_connection.close()
+                del self.mysql_connection
+        except:
+            pass
+            
     def reconnect(self):
         try:
             if self.mysql_connection:
@@ -221,6 +230,20 @@ ON calls.contact_b_id = contacts_b.id
         cursor.execute(insert_string, (contact_id, message, time_scheduled, engagement_id))
         self.mysql_connection.commit()
         print("Added scheduled text #%d" % cursor.lastrowid)
+
+    def update_entity_status(self, entity_table_name, entity_id,
+                             status, status_detail):
+        # DO NOT REMOVE.
+        # Using string substitition of this variable in SQL below.
+        entity_id_fieldname = entity_table_name[:-1] + "_id"
+        sql_query = ("UPDATE " + entity_table_name + " SET status = %s, "
+                     "status_detail = %s"
+               "WHERE id = %s")
+        cursor = self.mysql_connection.cursor()
+        cursor.execute(sql_query, (status, status_detail, entity_id))
+        result = cursor.rowcount
+        self.mysql_connection.commit()
+        return result
 
     def schedule_call(self, contact_a_id, contact_b_id, time_scheduled, engagement_id=0):
         # TODO - handle DST

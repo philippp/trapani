@@ -12,6 +12,7 @@ import http.server
 import time
 import crypto
 import datetime
+import config
 
 CYCLE_LOG_N = 10
 SLEEP_PERIOD_SECONDS = 10
@@ -94,7 +95,7 @@ class DispatcherService():
         if self.dry_run:
             print("Dry run: Would have sent \"%s\" to %s" % (message, target_number))
         else:
-            callback_url = "http://%s/reporting/text/%d" % (
+            callback_url = "%s/reporting/text/%d" % (
                 WEB_DOMAIN,
                 text_id)
             r = self.client.messages.create(
@@ -110,11 +111,11 @@ class DispatcherService():
     def _twilio_call(self, target_number_list, call_id, call_template="alpha_20min"):
         encrypted_number = self.cryptmaster.encrypt_string(target_number_list[1]).decode()
         encrypted_number = encrypted_number.replace("=","")
-        callback_url = "http://%s/reporting/call/%d" % (
+        callback_url = "%s/reporting/call/%d" % (
             WEB_DOMAIN,
             call_id)
         
-        url = "http://%s/dialpartner?ptoken=%s&template=%s" % (
+        url = "%s/dialpartner?ptoken=%s&template=%s" % (
             WEB_DOMAIN,
             encrypted_number,
             call_template)

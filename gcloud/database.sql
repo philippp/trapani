@@ -12,6 +12,8 @@ CREATE TABLE calls (
   time_call_connected TIMESTAMP NULL DEFAULT NULL,
   time_call_ended TIMESTAMP NULL DEFAULT NULL,
 	processor_id BIGINT UNSIGNED,
+  status_detail VARCHAR(1024),
+  status VARCHAR(20),
 	time_dispatcher_processed TIMESTAMP NULL DEFAULT NULL,
 	engagement_id INT
 );
@@ -30,8 +32,8 @@ CREATE TABLE texts (
   message VARCHAR(160) NOT NULL,
   time_dispatcher_processed TIMESTAMP NULL DEFAULT NULL,
   time_scheduled TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  text_status_detail VARCHAR(1024),
-  text_status INT,
+  status_detail VARCHAR(1024),
+  status VARCHAR(20),
   processor_id BIGINT UNSIGNED,
   engagement_id INT,
   time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -44,3 +46,13 @@ CREATE TABLE engagements (
   time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	engagement_number INT NOT NULL DEFAULT 1
 );
+
+ALTER TABLE texts
+DROP COLUMN sms_status;
+ALTER TABLE texts
+DROP COLUMN text_status_detail;
+
+ALTER TABLE calls
+ADD status VARCHAR(20);
+ALTER TABLE calls
+ADD status_detail VARCHAR(1024);
