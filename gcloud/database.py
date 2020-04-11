@@ -115,6 +115,37 @@ LEFT JOIN contacts ON contact_id = contacts.id
                 'message' : row[4]
             }
         return pending_texts
+
+    def read_engagements(self, cutoff_time=None):
+        sql_query = """
+SELECT 
+  id, 
+  time_scheduled, 
+  time_created,
+  engagement_number,
+  schedule_file_path
+FROM engagements
+"""
+        sql_query_params = []
+        if cutoff_time:
+            sql_query += " WHERE time_scheduled <= %s "
+                
+        cursor = self.mysql_connection.cursor()
+        
+        cursor.execute(sql_query, sql_query_params)
+        records = cursor.fetchall()
+        self.mysql_connection.commit()
+        engagements = dict()
+        for row in records:
+            engagements[row[0]] = {
+                'id' : row[0],
+                'time_scheduled' : row[1],
+                'time_created' : row[2],
+                'engagement_number' : row[3],
+                'schedule_file_path' : row[4]
+            }
+        return engagements
+
     
     def attempt_lock_text(self, text_id, processor_id=None):
         return self.attempt_lock_entity(text_id, 'texts', processor_id=processor_id)
@@ -159,7 +190,8 @@ SELECT
   contacts_a.phone_number as number_a,
   contacts_b.phone_number as number_b,
   calls.time_scheduled,
-  calls.time_dispatcher_processed
+  calls.time_dispatcher_processed,
+  calls.engagement_id
 FROM calls 
 LEFT JOIN contacts as contacts_a 
 ON calls.contact_a_id = contacts_a.id
@@ -198,7 +230,8 @@ ON calls.contact_b_id = contacts_b.id
                 'contact_a_number' : row[5],
                 'contact_b_number' : row[6],
                 'time_scheduled' : row[7],
-                'time_dispatcher_processed' : row[8]
+                'time_dispatcher_processed' : row[8],
+                'engagement_id' : row[9]
             }
         return pending_calls
 

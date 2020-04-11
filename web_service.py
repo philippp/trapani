@@ -1,16 +1,53 @@
 #!/usr/bin/env python3
-from twilio.twiml.voice_response import VoiceResponse, Say, Dial
-from flask import Flask, request, Response, g
+from collections import defaultdict
+from flask import request, Response, g
+import flask
+from gcloud import database
 from twilio import twiml
+from twilio.twiml.voice_response import VoiceResponse, Say, Dial
+import argparse
+import config
 import crypto
+import dateutil
+from dateutil.relativedelta import relativedelta
+import json
 import pdb
 import pprint
-import config
-from gcloud import database
-import argparse
-import json
+import datetime
+import pytz
 
-app = Flask(__name__)
+app = flask.Flask(__name__)
+
+def convert_utc_datetime_to_pst_str(dt):
+    if not dt:
+        return ""
+    utc = pytz.timezone('UTC')
+    aware_dt = utc.localize(dt)
+    pst = pytz.timezone('US/Pacific')
+    pacific_date = aware_dt.astimezone(pst)
+    return pacific_date.strftime("%Y-%m-%d %H:%M:%S")
+
+def convert_utc_datetime_to_relative_str(dt): #relativedelta_to_str(rd):
+    rd = relativedelta(dt, datetime.datetime.utcnow())
+
+    time_str = ""
+    fragments = list()
+    if rd.days != 0:
+        fragments.append("%d days" % abs(rd.days))
+    if rd.hours != 0:
+        fragments.append("%d hours" % abs(rd.hours))
+    if rd.days == 0 and rd.minutes != 0:
+        fragments.append("%d minutes" % abs(rd.minutes))
+    if len(fragments) == 2:
+        time_str = " and ".join(fragments)
+    elif len(fragments) == 3:
+        time_str = "%s, %s, and %s" % fragments
+    else:
+        time_str = fragments[0]
+    if rd.days < 0 or rd.hours < 0 or rd.minutes < 0:
+        return time_str + " ago"
+    else:
+        return "in " + time_str
 
 def request_has_connection():
     return hasattr(g, 'dbconn')
@@ -31,6 +68,23 @@ def close_db_connection(ex):
 def root():
     return Response(str("<html>v=time<br/>%s</html>" % WEB_DOMAIN), mimetype='text/xml')
 
+@app.route('/engagements', methods=['GET'])
+def engagements():
+    db_connection = get_request_connection()
+    calls = db_connection.read_calls()
+
+    calls_by_couple = defaultdict(list)
+    f_couplekey = lambda c: "%s & %s" % tuple(sorted([c['contact_a_name'], c['contact_b_name']]))
+
+    for call in calls.values():
+        # Convert timestamps to PST
+        call['time_scheduled_pst'] = convert_utc_datetime_to_pst_str(call['time_scheduled'])
+        call['time_processed_pst'] = convert_utc_datetime_to_pst_str(call['time_dispatcher_processed'])
+        call['time_scheduled_str'] = convert_utc_datetime_to_relative_str(call['time_scheduled'])
+        rd = relativedelta(call['time_scheduled'], datetime.datetime.utcnow())
+        call['relative_delta'] = rd
+        calls_by_couple[f_couplekey(call)].append(call)
+    return flask.render_template('engagements.tmpl', calls_by_couple = calls_by_couple)
 
 @app.route('/sms', methods=['POST'])
 def sms():
