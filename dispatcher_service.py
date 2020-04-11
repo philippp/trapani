@@ -12,16 +12,12 @@ import http.server
 import time
 import crypto
 import datetime
+import config
 
 CYCLE_LOG_N = 10
 SLEEP_PERIOD_SECONDS = 10
 HTTP_REQUEST_PERIOD = 2  # 0.5 QPS
 CYCLE = 0
-
-TWILIO_WEB_DOMAIN = {
-    'prod':"35.223.137.150",
-    'dev':"135.180.93.160:5000"
-}
 
 #def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
 
@@ -39,7 +35,8 @@ class ProofOfLifeHandler(http.server.BaseHTTPRequestHandler):
     
 class DispatcherService():
     
-    def __init__(self, account_sid, auth_token, client_phone_number, dry_run=False, db_instance=False, twilio_instance='dev'):
+    def __init__(self, account_sid, auth_token, client_phone_number,
+                 dry_run=False, db_instance=False):
         self.account_sid = account_sid
         self.auth_token = auth_token
         self.client = Client(account_sid, auth_token)
@@ -50,7 +47,6 @@ class DispatcherService():
         self.database = database.Database()
         self.database.connect(database.db_info[db_instance])
         self.cryptmaster = crypto.Cryptmaster()
-        self.twilio_web_domain = TWILIO_WEB_DOMAIN[twilio_instance]
         server_address = ('0.0.0.0', 8000)
         self.httpd = http.server.HTTPServer(server_address, ProofOfLifeHandler)
         self.httpd.timeout = HTTP_REQUEST_PERIOD
@@ -99,8 +95,8 @@ class DispatcherService():
         if self.dry_run:
             print("Dry run: Would have sent \"%s\" to %s" % (message, target_number))
         else:
-            callback_url = "http://%s/reporting/text/%d" % (
-                self.twilio_web_domain,
+            callback_url = "%s/reporting/text/%d" % (
+                WEB_DOMAIN,
                 text_id)
             r = self.client.messages.create(
                 from_=self.client_phone_number,
@@ -115,12 +111,12 @@ class DispatcherService():
     def _twilio_call(self, target_number_list, call_id, call_template="alpha_20min"):
         encrypted_number = self.cryptmaster.encrypt_string(target_number_list[1]).decode()
         encrypted_number = encrypted_number.replace("=","")
-        callback_url = "http://%s/reporting/call/%d" % (
-            self.twilio_web_domain,
+        callback_url = "%s/reporting/call/%d" % (
+            WEB_DOMAIN,
             call_id)
         
-        url = "http://%s/dialpartner?ptoken=%s&template=%s" % (
-            self.twilio_web_domain,
+        url = "%s/dialpartner?ptoken=%s&template=%s" % (
+            WEB_DOMAIN,
             encrypted_number,
             call_template)
 
@@ -171,7 +167,7 @@ if __name__ == '__main__':  # noqa: C901
     parser.add_argument(
         '--database', help='dev or prod database', default="dev")
     parser.add_argument(
-        '--twilio', help='dev or prod twilio service', default="dev")
+        '--web_instance', help='dev or prod web instance', default="dev")
     
     subparsers = parser.add_subparsers(dest='command')
     p = subparsers.add_parser('dispatch_one_text', help=DispatcherService.dispatch_one.__doc__)
@@ -187,13 +183,18 @@ if __name__ == '__main__':  # noqa: C901
         '--dry_run', help='Does not initiate calls or texts.', const = True, nargs="?", default=False)
 
     args = parser.parse_args()
+    global WEB_DOMAIN
+    if args.web_instance == 'dev':
+        WEB_DOMAIN = config.WEB_DOMAIN_DEV
+    else:
+        WEB_DOMAIN = config.WEB_DOMAIN_PROD
+        
     dispatch = DispatcherService(
         twilio_auth_token.twilio_account_sid,
         twilio_auth_token.twilio_token,
         twilio_auth_token.twilio_phone,
         dry_run = getattr(args, 'dry_run', False),
-        db_instance = args.database,
-        twilio_instance = args.twilio
+        db_instance = args.database
     )
     if args.command == 'dispatch_one_text':
         dispatch.dispatch_one(itemtype="text")

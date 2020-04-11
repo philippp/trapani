@@ -1,0 +1,22 @@
+<!doctype html>
+
+<html>
+<head>
+<title>engagements</title>
+<style>
+div.past {
+				 color: #999999;
+}
+</style>
+</head>
+{% for couple_name, calls in calls_by_couple.items() %}
+<h2>{{couple_name}}</h2>
+{% for call in calls %}
+	 {% if call['relative_delta'].days < 14 and call['relative_delta'].days > -14 %}
+	 <div {{ 'class="past"' if call['relative_delta'].days < 0 or call['relative_delta'].hours < 0 }}>
+	 {{call.time_scheduled_str}} ({{call.time_scheduled_pst}})
+	 </div>
+	 {% endif %}
+{% endfor %}
+{% endfor %}
+</html>
