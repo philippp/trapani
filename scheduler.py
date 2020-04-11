@@ -124,7 +124,8 @@ def program_texts(db, engagement, engagement_id, engagement_number):
     db.schedule_text(engagement.contact_a['id'],
                      MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_b['name'],
                                          TEXT_BEFORE_CALL_IN_MINUTES),
-                     datestring_text)
+                     datestring_text,
+                     engagement_id = engagement_id)
     db.schedule_text(engagement.contact_b['id'],
                      MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_a['name'],
                                          TEXT_BEFORE_CALL_IN_MINUTES),
