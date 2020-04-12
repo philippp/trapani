@@ -47,12 +47,19 @@ CREATE TABLE engagements (
 	engagement_number INT NOT NULL DEFAULT 1
 );
 
-ALTER TABLE texts
-DROP COLUMN sms_status;
-ALTER TABLE texts
-DROP COLUMN text_status_detail;
+CREATE TABLE pairings (
+	id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+	contact_a_id INT NOT NULL,
+	contact_b_id INT NOT NULL,
+  time_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  time_status_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	time_latest_call TIMESTAMP NULL DEFAULT NULL,
+	comment MEDIUMTEXT,
+	status INT NOT NULL default 1
+);
+ALTER TABLE pairings ADD CONSTRAINT pairing_unique UNIQUE KEY (contact_a_id, contact_b_id);
 
-ALTER TABLE calls
-ADD status VARCHAR(20);
-ALTER TABLE calls
-ADD status_detail VARCHAR(1024);
+INSERT INTO pairings (contact_a_id, contact_b_id, time_latest_call)
+  SELECT contact_a_id, contact_b_id, max(time_scheduled)
+	FROM calls
+	WHERE CONCAT(contact_a_id, contact_b_id) NOT IN (SELECT CONCAT(contact_a_id, contact_b_id) FROM pairings) GROUP BY contact_a_id, contact_b_id;

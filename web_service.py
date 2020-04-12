@@ -42,8 +42,10 @@ def convert_utc_datetime_to_relative_str(dt): #relativedelta_to_str(rd):
         time_str = " and ".join(fragments)
     elif len(fragments) == 3:
         time_str = "%s, %s, and %s" % fragments
-    else:
+    elif fragments:
         time_str = fragments[0]
+    else:
+        return ""
     if rd.days < 0 or rd.hours < 0 or rd.minutes < 0:
         return time_str + " ago"
     else:
@@ -68,8 +70,8 @@ def close_db_connection(ex):
 def root():
     return Response(str("<html>v=time<br/>%s</html>" % WEB_DOMAIN), mimetype='text/xml')
 
-@app.route('/engagements', methods=['GET'])
-def engagements():
+@app.route('/list_engagements', methods=['GET'])
+def list_engagements():
     db_connection = get_request_connection()
     calls = db_connection.read_calls()
 
@@ -85,6 +87,66 @@ def engagements():
         call['relative_delta'] = rd
         calls_by_couple[f_couplekey(call)].append(call)
     return flask.render_template('engagements.tmpl', calls_by_couple = calls_by_couple)
+
+@app.route('/list_pairs', methods=['GET'])
+def list_pairs():
+    db_connection = get_request_connection()
+    calls = db_connection.read_calls()
+
+    calls_by_couple = defaultdict(list)
+    f_couplekey = lambda c: "%s & %s" % tuple(sorted([c['contact_a_name'], c['contact_b_name']]))
+
+    for call in calls.values():
+        # Convert timestamps to PST
+        call['time_scheduled_pst'] = convert_utc_datetime_to_pst_str(call['time_scheduled'])
+        call['time_processed_pst'] = convert_utc_datetime_to_pst_str(call['time_dispatcher_processed'])
+        call['time_scheduled_str'] = convert_utc_datetime_to_relative_str(call['time_scheduled'])
+        rd = relativedelta(call['time_scheduled'], datetime.datetime.utcnow())
+        call['relative_delta'] = rd
+        calls_by_couple[f_couplekey(call)].append(call)
+    return flask.render_template('engagements.tmpl', calls_by_couple = calls_by_couple)
+
+@app.route('/list_contacts', methods=['GET'])
+def list_contacts():
+    db_connection = get_request_connection()
+    contacts = db_connection.read_contacts()
+    for contact in contacts:
+        print(type(contact['latest_time_scheduled']))
+        print(contact['latest_time_scheduled'])
+        print("\n")
+        contact['latest_time_scheduled_pst'] = convert_utc_datetime_to_relative_str(
+            contact['latest_time_scheduled'])
+    return flask.render_template('list_contacts.tmpl', contacts = contacts)
+
+@app.route('/contact/<contact_id>', methods=['GET'])
+def contact(contact_id):
+    db_connection = get_request_connection()
+    contact_list = db_connection.read_contacts(contact_id = contact_id)
+    if not contact_list:
+        return Response(str("User ID not found"), mimetype='text/xml')
+    contact = contact_list[0]
+    calls = db_connection.read_calls(contact_id = contact_id)
+    calls_by_couple = defaultdict(list)
+    f_couplekey = lambda c: "%s & %s" % tuple(sorted([c['contact_a_name'], c['contact_b_name']]))
+
+    for call in calls.values():
+        # Convert timestamps to PST
+        call['time_scheduled_pst'] = convert_utc_datetime_to_pst_str(call['time_scheduled'])
+        call['time_processed_pst'] = convert_utc_datetime_to_pst_str(call['time_dispatcher_processed'])
+        call['time_scheduled_str'] = convert_utc_datetime_to_relative_str(call['time_scheduled'])
+        rd = relativedelta(call['time_scheduled'], datetime.datetime.utcnow())
+        call['relative_delta'] = rd
+        calls_by_couple[f_couplekey(call)].append(call)
+    return flask.render_template('contact.tmpl', contact = contact, calls_by_couple = calls_by_couple)
+
+@app.route('/engagement_create', methods=['GET'])
+def engagement_create():
+    return flask.render_template('engagement_create.tmpl')
+
+@app.route('/engagement_create_post', methods=['POST'])
+def engagement_create_post():
+    pprint.pprint(request.form)
+    return flask.render_template('engagement_create.tmpl')
 
 @app.route('/sms', methods=['POST'])
 def sms():

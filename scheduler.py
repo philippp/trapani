@@ -68,7 +68,7 @@ def get_or_create_contact_map(db, engagement_schedule):
     engagement_numbers = [[r[1],r[3]] for r in engagement_schedule]
     engagement_numbers = set([item for sublist in engagement_numbers for item in sublist])
     contact_map = dict()
-    for contact in db.read_contacts_by_number(list(engagement_numbers)):
+    for contact in db.read_contacts(numbers=list(engagement_numbers)):
         contact_map[contact['phone_number']] = contact
     missing_numbers = engagement_numbers - set(contact_map.keys())
     if missing_numbers:

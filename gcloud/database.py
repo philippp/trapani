@@ -58,25 +58,56 @@ class Database:
             pass
         self.mysql_connection = mysql.connector.connect(**self.config)
 
-    def read_contacts_by_number(self, number_list):
+    def read_contacts(self, numbers = None, contact_id = None):
+        where_clause = ""
+        sql_var = None
+        if numbers:
+            sql_var = (",".join((['%s'] * len(numbers)))) % tuple(numbers)
+            where_clause = "WHERE phone_number IN (%s)"
+        elif contact_id:
+            sql_var = contact_id
+            where_clause = "WHERE contacts.id = %s"
+            
         sql_query = """
 SELECT
-  id,
+  contacts.id,
   name,
   phone_number,
-  time_created
+  contacts.time_created,
+  GREATEST(MAX(COALESCE(calls_a.time_scheduled, 0)), MAX(COALESCE(calls_b.time_scheduled, 0))) as latest_time_scheduled,
+  COUNT(DISTINCT calls_a.id) + COUNT(DISTINCT calls_b.id) as total_calls,
+  COUNT(DISTINCT calls_a.contact_b_id) + COUNT(DISTINCT calls_b.contact_a_id) as distinct_partners
 FROM
   contacts
-WHERE
-  phone_number IN (%s)
-""" % ",".join((['%s'] * len(number_list)))
+LEFT JOIN
+  calls as calls_a
+ON contacts.id = calls_a.contact_a_id
+LEFT JOIN
+  calls as calls_b
+ON contacts.id = calls_b.contact_b_id
+""" + where_clause + """
+GROUP BY 1,2,3,4
+ORDER BY 5 DESC
+"""
+
         cursor = self.mysql_connection.cursor()
-        cursor.execute(sql_query, number_list)
+        if sql_var is not None:
+            print(sql_query)
+            print(sql_var)
+            cursor.execute(sql_query, (sql_var,))
+        else:
+            cursor.execute(sql_query)
         records = cursor.fetchall()
         self.mysql_connection.commit()
-        return [
-            dict(zip(('id', 'name', 'phone_number', 'time_created'),r)) for r in records
-            ]
+        return_list = list()
+        for r in records:
+            r_modified = list(r)
+            r_modified[4] = dateutil.parser.parse(r[4])
+            return_list.append(
+                dict(zip(
+                    ('id', 'name', 'phone_number', 'time_created', 'latest_time_scheduled',
+                     'total_calls', 'distinct_partners'),r_modified)))
+        return return_list
     
     def read_texts(self, cutoff_time=None, exclude_processed=False):
         sql_query = """
@@ -171,7 +202,7 @@ FROM engagements
         return result
 
     def read_calls(self, cutoff_time=None, exclude_processed=False,
-                   caller_numbers=None):
+                   caller_numbers=None, contact_id = None):
         """
         List all calls in the system.
         cutoff_time: If specified, only read calls scheduled before this time.
@@ -198,7 +229,7 @@ ON calls.contact_a_id = contacts_a.id
 LEFT JOIN contacts as contacts_b
 ON calls.contact_b_id = contacts_b.id
 """
-        if cutoff_time or exclude_processed or caller_numbers:
+        if cutoff_time or exclude_processed or caller_numbers or contact_id:
             sql_query += " WHERE "
             clauses = []
             if exclude_processed:
@@ -210,6 +241,10 @@ ON calls.contact_b_id = contacts_b.id
                 """)
                 for number in list(caller_numbers) * 2:
                     sql_query_params.append(number)
+            if contact_id:
+                clauses.append(" (contact_a_id = %s OR contact_b_id = %s) ")
+                sql_query_params.append(contact_id)
+                sql_query_params.append(contact_id)                
             if cutoff_time:
                 clauses.append(" time_scheduled <= %s")
                 sql_query_params.append(cutoff_time)
