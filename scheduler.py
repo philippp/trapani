@@ -18,16 +18,17 @@ MESSAGE_TEMPLATES = {
 }
 
 class Engagement:
-    def __init__(self, schedule_row, contact_a, contact_b):
+    def __init__(self, time_call_scheduled_pst, contact_a, contact_b):
         self.contact_a = contact_a
         self.contact_b = contact_b
-        self.time_call_scheduled = schedule_row[4]+"T"+schedule_row[5]
+        self.time_call_scheduled = time_call_scheduled_pst 
         
 def format_phone_number(input_number):
     raw_number = "".join(re.findall(r'\d', input_number))
     if len(raw_number) == 10:
         raw_number = "1"+raw_number
     return "+"+raw_number
+
 
 
 def program_schedule(db, schedule_file_path):
@@ -57,11 +58,10 @@ def program_schedule(db, schedule_file_path):
         contact_map = get_or_create_contact_map(db, engagement_schedule)
         
         for schedule_row in engagement_schedule:
-            engagement = Engagement(schedule_row,
-                                    contact_map[schedule_row[1]],
-                                    contact_map[schedule_row[3]])
+            engagement = Engagement(schedule_row[4]+"T"+schedule_row[5],
+                                    contact_map[schedule_row[1]]['phone_number'],
+                                    contact_map[schedule_row[3]]['phone_number'])
             program_engagement(db, engagement, schedule_file_path)
-        # pass
 
 def get_or_create_contact_map(db, engagement_schedule):
     engagement_numbers = [[r[1],r[3]] for r in engagement_schedule]

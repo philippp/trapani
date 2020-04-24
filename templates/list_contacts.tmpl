@@ -1,0 +1,35 @@
+<html>
+<head>
+<title>Contacts</title>
+</head>
+<body>
+	<table>
+		<tr>
+			<td>Name</td><td>Number</td><td>latest call (PST)</td><td>total calls</td><td>partners</td><td>partner names</td>
+		</tr>
+		{% for contact in contacts %}
+		<tr>
+			<td>
+				<a href="/contact/{{contact.id}}">{{contact.name}}</a>
+			</td>
+			<td>
+				{{contact.phone_number}}
+			</td>
+			<td>
+				{{contact.latest_time_scheduled_pst}}
+			</td>
+			<td>
+				{{contact.total_calls}}
+			</td>
+			<td>
+				{{contact.distinct_partners}}
+			</td>
+			<td>
+				{{contact.partner_names}}
+			</td>			
+		</tr>
+		{% endfor %}
+	</table>
+	<a href="/contact_edit">Add a contact</a>
+</body>
+</html>

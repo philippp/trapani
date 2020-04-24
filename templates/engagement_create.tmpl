@@ -1,0 +1,74 @@
+<!doctype html>
+
+<html>
+<head>
+	<title>Create new engagement</title>
+</head>
+<body>
+<form action="/engagement_create" method="post">
+	<table>
+		<tr>
+			<td>
+				Number A
+			</td>
+			<td>
+				<input type="text" name="number_a" value="{{contact_a.phone_number}}"/>
+			</td>
+			<td>
+   			Format +11234567890
+			</td>
+		</tr>
+		<tr>
+			<td>
+				Name A
+			</td>
+			<td>
+				<input type="text" name="name_a" value="{{contact_a.name}}"/>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				Number B
+			</td>
+			<td>
+				<input type="text" name="number_b" value="{{contact_b.phone_number}}"/>
+			</td>
+			<td>
+   			Format +11234567890
+			</td>			
+		</tr>
+		<tr>
+			<td>
+				Name B
+			</td>
+			<td>
+				<input type="text" name="name_b" value="{{contact_b.name}}"/>
+			</td>			
+		</tr>
+		<tr>
+			<td>
+				Date
+			</td>
+			<td>
+				<input type="text" name="date_str"/>
+			</td>
+			<td>
+				Format YYYY-MM-DD
+			</td>			
+		</tr>
+		<tr>
+			<td>
+				Time
+			</td>
+			<td>
+				<input type="text" name="time_str"/>
+			</td>
+			<td>
+				PST timezone, Format HH:MM
+			</td>						
+		</tr>
+  </table>
+	<button type="submit">Submit</button>
+</form>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<html>
+<head>
+<title>{{contact.name}}</title>
+<style>
+div.past {
+				 color: #999999;
+}
+</style>
+</head>
+<body>
+  <table>
+		<tr>
+			<td>Name</td><td>Number</td><td>latest call (PST)</td><td>total calls</td><td>partners</td><td>partner names</td>
+		</tr>
+		<tr>
+			<td>
+				<a href="/contact/{{contact.id}}">{{contact.name}}</a>
+			</td>
+			<td>
+				{{contact.phone_number}}
+			</td>
+			<td>
+				{{contact.latest_time_scheduled_pst}}
+			</td>
+			<td>
+				{{contact.total_calls}}
+			</td>
+			<td>
+				{{contact.distinct_partners}}
+			</td>
+			<td>
+				{{contact.partner_names}}
+			</td>			
+		</tr>
+	</table>
+	<a href="/contact_edit?contact_id={{contact.id}}">Edit contact</a>
+	<form action="/engagement_create" method="GET">
+		<input type="hidden" name="contact_a_id" value="{{contact.id}}"/>
+		<select id="contact_b_id" name="contact_b_id">
+			{% for contact in contact_list_minimal %}
+			<option value="{{contact.id}}">{{contact.name}}</option>
+			{% endfor %}
+		</select>
+		<button type="submit">submit</button>
+	</form>
+	{% for couple_key, couple_dict in calls_by_couple.items() %}
+<h2>{{couple_dict.couple_name}}</h2>
+<a href="/engagement_create?contact_a_id={{couple_dict.contact_a_id}}&contact_b_id={{couple_dict.contact_b_id}}">Schedule new call for {{couple_dict.couple_name}}</a>
+{% for call in couple_dict.calls %}
+	 <div {{ 'class="past"' if call['relative_delta'].days < 0 or call['relative_delta'].hours < 0 }}>
+	 {{call.time_scheduled_str}} ({{call.time_scheduled_pst}})
+	 </div>
+{% endfor %}
+{% endfor %}

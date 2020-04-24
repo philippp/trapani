@@ -1,0 +1,26 @@
+<html>
+<head>
+<title>{{contact.name}}</title>
+</head>
+<body>
+<form action="/contact_edit" method="post">
+<table>
+  <tr>
+    <td>Name</td>
+    <td>Phone Number</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>
+	    <input type="text" name="name" value="{{contact.name}}" />
+    </td>
+    <td>
+      <input type="text" name="phone_number" value="{{contact.phone_number}}" />
+    </td>
+    <td>
+      <input type="hidden" name="contact_id" value="{{contact.id}}" />
+    </td>
+  </tr>
+</table>
+<button type="submit">Submit</button>
+</form>

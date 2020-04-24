@@ -17,6 +17,7 @@ import pprint
 import datetime
 import pytz
 import jinja2
+import scheduler
 
 app = flask.Flask(__name__)
 
@@ -206,7 +207,13 @@ def engagement_create():
 @app.route('/engagement_create', methods=['POST'])
 def engagement_create_post():
     pprint.pprint(request.form)
-    return flask.render_template('engagement_create.tmpl')
+    db = get_request_connection()
+    contacts = db.read_contacts(numbers=[request.form['number_a'], request.form['number_b']])
+    assert len(contacts) == 2
+    time_call_scheduled_pst = request.form['date_str']+"T"+request.form['time_str']
+    engagement = scheduler.Engagement(time_call_scheduled_pst, contacts[0], contacts[1])
+    scheduler.program_engagement(db, engagement, 'web_service')
+    return redirect("/contacts", code=302)
 
 @app.route('/sms', methods=['POST'])
 def sms():

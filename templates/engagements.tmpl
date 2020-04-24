@@ -14,8 +14,8 @@ div.past {
 {% if call['relative_delta'].days < 14 and call['relative_delta'].days > -14 %}
 	 {{call.contact_a_name}} & {{call.contact_b_name}}
 	 <div {{ 'class="past"' if call['relative_delta'].days < 0 or call['relative_delta'].hours < 0 }}>
-	 Scheduled for {{call.time_scheduled_str}} ({{call.time_scheduled_pst}})<br/>
-	 {% if call.time_processed_pst %} Processed at {{call.time_processed_pst}} {% else %} not processed {% endif %}</br>																												 
+	 Scheduled {{call.time_scheduled_str}} ({{call.time_scheduled_pst}})<br/>
+	 Call {% if call.time_processed_pst %} processed at {{call.time_processed_pst}}{% else %} not yet processed{% endif %}.</br>																												 
 	 </div>
 	 {% endif %}
 {% endfor %}
