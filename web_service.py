@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from collections import defaultdict
-from flask import request, Response, g
+from flask import request, Response, g, redirect
 import flask
 from gcloud import database
 from twilio import twiml
 from twilio.twiml.voice_response import VoiceResponse, Say, Dial
+import mysql.connector.errors
 import argparse
 import config
 import crypto
@@ -15,6 +16,7 @@ import pdb
 import pprint
 import datetime
 import pytz
+import jinja2
 
 app = flask.Flask(__name__)
 
@@ -70,14 +72,10 @@ def close_db_connection(ex):
 def root():
     return Response(str("<html>v=time<br/>%s</html>" % WEB_DOMAIN), mimetype='text/xml')
 
-@app.route('/list_engagements', methods=['GET'])
-def list_engagements():
+@app.route('/engagements', methods=['GET'])
+def engagements():
     db_connection = get_request_connection()
     calls = db_connection.read_calls()
-
-    calls_by_couple = defaultdict(list)
-    f_couplekey = lambda c: "%s & %s" % tuple(sorted([c['contact_a_name'], c['contact_b_name']]))
-
     for call in calls.values():
         # Convert timestamps to PST
         call['time_scheduled_pst'] = convert_utc_datetime_to_pst_str(call['time_scheduled'])
@@ -85,8 +83,8 @@ def list_engagements():
         call['time_scheduled_str'] = convert_utc_datetime_to_relative_str(call['time_scheduled'])
         rd = relativedelta(call['time_scheduled'], datetime.datetime.utcnow())
         call['relative_delta'] = rd
-        calls_by_couple[f_couplekey(call)].append(call)
-    return flask.render_template('engagements.tmpl', calls_by_couple = calls_by_couple)
+    return flask.render_template('engagements.tmpl',
+                                 calls = sorted(calls.values(), key=lambda c: c['time_scheduled'])[::-1])
 
 @app.route('/list_pairs', methods=['GET'])
 def list_pairs():
@@ -106,8 +104,8 @@ def list_pairs():
         calls_by_couple[f_couplekey(call)].append(call)
     return flask.render_template('engagements.tmpl', calls_by_couple = calls_by_couple)
 
-@app.route('/list_contacts', methods=['GET'])
-def list_contacts():
+@app.route('/contacts', methods=['GET'])
+def contacts():
     db_connection = get_request_connection()
     contacts = db_connection.read_contacts()
     for contact in contacts:
@@ -121,14 +119,22 @@ def list_contacts():
 @app.route('/contact/<contact_id>', methods=['GET'])
 def contact(contact_id):
     db_connection = get_request_connection()
-    contact_list = db_connection.read_contacts(contact_id = contact_id)
-    if not contact_list:
+    contact_list = db_connection.read_contacts()
+    contact_list_minimal = list()
+    profile_contact = None
+    for c in contact_list:
+        contact_list_minimal.append(dict(
+            id = c['id'],
+            name = c['name'],
+            phone_number = c['phone_number']))
+        if str(c['id']) == contact_id:
+            profile_contact = c
+    if not profile_contact:
         return Response(str("User ID not found"), mimetype='text/xml')
-    contact = contact_list[0]
     calls = db_connection.read_calls(contact_id = contact_id)
-    calls_by_couple = defaultdict(list)
-    f_couplekey = lambda c: "%s & %s" % tuple(sorted([c['contact_a_name'], c['contact_b_name']]))
-
+    calls_by_couple = defaultdict(lambda: defaultdict(list))
+    f_couplename = lambda c: "%s & %s" % tuple(sorted([c['contact_a_name'], c['contact_b_name']]))
+    f_couplekey = lambda c: "%d_%d" % tuple(sorted([c['contact_a_id'], c['contact_b_id']]))
     for call in calls.values():
         # Convert timestamps to PST
         call['time_scheduled_pst'] = convert_utc_datetime_to_pst_str(call['time_scheduled'])
@@ -136,14 +142,68 @@ def contact(contact_id):
         call['time_scheduled_str'] = convert_utc_datetime_to_relative_str(call['time_scheduled'])
         rd = relativedelta(call['time_scheduled'], datetime.datetime.utcnow())
         call['relative_delta'] = rd
-        calls_by_couple[f_couplekey(call)].append(call)
-    return flask.render_template('contact.tmpl', contact = contact, calls_by_couple = calls_by_couple)
+        couple_key = f_couplekey(call)
+        calls_by_couple[couple_key]['calls'].append(call)
+        calls_by_couple[couple_key]['couple_name'] = f_couplename(call)
+        calls_by_couple[couple_key]['contact_a_id'] = call['contact_a_id']
+        calls_by_couple[couple_key]['contact_b_id'] = call['contact_b_id']
+        
+    return flask.render_template('contact.tmpl',
+                                 contact = profile_contact,
+                                 calls_by_couple = calls_by_couple,
+                                 contact_list_minimal = contact_list_minimal)
+
+@app.route('/contact_edit', methods=['GET'])
+def contact_edit_form():
+    contact_id = request.args.get('contact_id')
+    if contact_id:
+        db_connection = get_request_connection()
+        contact_list = db_connection.read_contacts(contact_id = contact_id)
+        if not contact_list:
+            return Response(str("User ID not found"), mimetype='text/xml')
+        contact = contact_list[0]
+    else:
+        contact = defaultdict(str)
+    #number = request.form['From']
+    return flask.render_template('contact_edit.tmpl', contact = contact)
+
+@app.route('/contact_edit', methods=['POST'])
+def contact_edit_process():
+    contact_id = request.form.get('contact_id')
+    db_connection = get_request_connection()
+    if contact_id:
+        db_connection.edit_contact(contact_id, request.form.get('name'), request.form.get('phone_number'))
+    else:
+        contact = dict(
+            name = request.form.get('name'),
+            phone_number = request.form.get('phone_number')
+        )
+        try:
+            db_connection.add_contacts([contact])
+        except mysql.connector.errors.IntegrityError as e:
+            return Response("<html><pre>"+str(e.msg)+"</pre></html>", mimetype='text/xml')            
+    return redirect("/contacts", code=302)
 
 @app.route('/engagement_create', methods=['GET'])
 def engagement_create():
-    return flask.render_template('engagement_create.tmpl')
+    contact_a_id = request.args.get('contact_a_id')
+    contact_b_id = request.args.get('contact_b_id')
+    db_connection = get_request_connection()    
+    contact_list = db_connection.read_contacts()
+    contact_list_minimal = list()
+    contact_a = defaultdict(str)
+    contact_b = defaultdict(str)
+    for c in contact_list:
+        if str(c['id']) == contact_a_id:
+            contact_a = c
+        elif str(c['id']) == contact_b_id:
+            contact_b = c
 
-@app.route('/engagement_create_post', methods=['POST'])
+    return flask.render_template('engagement_create.tmpl',
+                                 contact_a = contact_a,
+                                 contact_b = contact_b)
+
+@app.route('/engagement_create', methods=['POST'])
 def engagement_create_post():
     pprint.pprint(request.form)
     return flask.render_template('engagement_create.tmpl')

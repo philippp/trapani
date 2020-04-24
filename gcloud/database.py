@@ -62,8 +62,8 @@ class Database:
         where_clause = ""
         sql_var = None
         if numbers:
-            sql_var = (",".join((['%s'] * len(numbers)))) % tuple(numbers)
-            where_clause = "WHERE phone_number IN (%s)"
+            sql_var = tuple(numbers)
+            where_clause = "WHERE phone_number IN (%s)" % ",".join(['%s'] * len(numbers))
         elif contact_id:
             sql_var = contact_id
             where_clause = "WHERE contacts.id = %s"
@@ -92,9 +92,7 @@ ORDER BY 5 DESC
 
         cursor = self.mysql_connection.cursor()
         if sql_var is not None:
-            print(sql_query)
-            print(sql_var)
-            cursor.execute(sql_query, (sql_var,))
+            cursor.execute(sql_query, sql_var)
         else:
             cursor.execute(sql_query)
         records = cursor.fetchall()
@@ -102,7 +100,10 @@ ORDER BY 5 DESC
         return_list = list()
         for r in records:
             r_modified = list(r)
-            r_modified[4] = dateutil.parser.parse(r[4])
+            if r[4] and r[4] != '0':
+                r_modified[4] = dateutil.parser.parse(r[4])
+            else:
+                r_modified[4] = None
             return_list.append(
                 dict(zip(
                     ('id', 'name', 'phone_number', 'time_created', 'latest_time_scheduled',
@@ -270,6 +271,15 @@ ON calls.contact_b_id = contacts_b.id
             }
         return pending_calls
 
+    def edit_contact(self, contact_id, contact_name, contact_number):
+        cursor = self.mysql_connection.cursor()
+        insert_string = "UPDATE contacts SET name = %s, phone_number = %s WHERE id = %s"
+        result = cursor.execute(
+            insert_string,
+            [contact_name, contact_number, contact_id])
+        self.mysql_connection.commit()
+        
+    
     def add_contacts(self, contacts):
         """Adds contacts.
         Format is {'name':contact_name, 'phone_number':contact_number}

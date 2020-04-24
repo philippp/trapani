@@ -38,7 +38,6 @@ def program_schedule(db, schedule_file_path):
         for row in schedule_reader:
             row_number += 1
             if row_number == 1:
-                print(row)
                 assert (
                     row[0] == 'Name A' and
                     row[1] == 'Number A' and
@@ -68,6 +67,8 @@ def get_or_create_contact_map(db, engagement_schedule):
     engagement_numbers = [[r[1],r[3]] for r in engagement_schedule]
     engagement_numbers = set([item for sublist in engagement_numbers for item in sublist])
     contact_map = dict()
+    contacts = db.read_contacts(numbers=list(engagement_numbers))
+
     for contact in db.read_contacts(numbers=list(engagement_numbers)):
         contact_map[contact['phone_number']] = contact
     missing_numbers = engagement_numbers - set(contact_map.keys())

@@ -9,14 +9,15 @@ div.past {
 }
 </style>
 </head>
-{% for couple_name, calls in calls_by_couple.items() %}
-<h2>{{couple_name}}</h2>
+<body>
 {% for call in calls %}
-	 {% if call['relative_delta'].days < 14 and call['relative_delta'].days > -14 %}
+{% if call['relative_delta'].days < 14 and call['relative_delta'].days > -14 %}
+	 {{call.contact_a_name}} & {{call.contact_b_name}}
 	 <div {{ 'class="past"' if call['relative_delta'].days < 0 or call['relative_delta'].hours < 0 }}>
-	 {{call.time_scheduled_str}} ({{call.time_scheduled_pst}})
+	 Scheduled for {{call.time_scheduled_str}} ({{call.time_scheduled_pst}})<br/>
+	 {% if call.time_processed_pst %} Processed at {{call.time_processed_pst}} {% else %} not processed {% endif %}</br>																												 
 	 </div>
 	 {% endif %}
 {% endfor %}
-{% endfor %}
+</body>
 </html>
