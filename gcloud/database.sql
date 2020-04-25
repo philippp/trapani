@@ -29,7 +29,7 @@ ALTER TABLE contacts ADD CONSTRAINT contacts_phone_unique UNIQUE KEY (phone_numb
 CREATE TABLE texts (
   id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
   contact_id INT NOT NULL,
-  message VARCHAR(160) NOT NULL,
+  message VARCHAR(1024) NOT NULL,
   time_dispatcher_processed TIMESTAMP NULL DEFAULT NULL,
   time_scheduled TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   status_detail VARCHAR(1024),

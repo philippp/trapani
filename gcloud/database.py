@@ -65,8 +65,8 @@ class Database:
             sql_var = tuple(numbers)
             where_clause = "WHERE phone_number IN (%s)" % ",".join(['%s'] * len(numbers))
         elif contact_id:
-            sql_var = contact_id
-            where_clause = "WHERE contacts.id = %s"
+            sql_var = (contact_id,)
+            where_clause = "WHERE contacts.id = %s "
             
         sql_query = """
 SELECT
@@ -295,9 +295,6 @@ ON calls.contact_b_id = contacts_b.id
     def schedule_text(self, contact_id, message, time_scheduled, engagement_id=0):
         """Schedules a text message.
         TODO: Validate and reformat datetime and phone #"""
-        if len(message) > 160:
-            # TODO - log failure
-            raise Exception()
         # TODO - handle DST
         dt = dateutil.parser.parse(time_scheduled+"-07:00")
         time_scheduled = dt.astimezone(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

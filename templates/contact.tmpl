@@ -8,43 +8,48 @@ div.past {
 </style>
 </head>
 <body>
-  <table>
-		<tr>
-			<td>Name</td><td>Number</td><td>latest call (PST)</td><td>total calls</td><td>partners</td><td>partner names</td>
-		</tr>
+	<h1>{{contact.name}}</h1>
+	<table>
 		<tr>
 			<td>
-				<a href="/contact/{{contact.id}}">{{contact.name}}</a>
+				Phone Number:
 			</td>
 			<td>
 				{{contact.phone_number}}
 			</td>
+		</tr>
+		<tr>
+			<td>
+				latest call
+			</td>
 			<td>
 				{{contact.latest_time_scheduled_pst}}
 			</td>
+		</tr>
+		<tr>
+			<td>total calls</td>
 			<td>
 				{{contact.total_calls}}
 			</td>
+		</tr>
+		<tr>
+			<td>partners</td>
 			<td>
 				{{contact.distinct_partners}}
 			</td>
+		</tr>
+		<tr>
+			<td>partner names</td>
 			<td>
 				{{contact.partner_names}}
-			</td>			
+			</td>
 		</tr>
 	</table>
 	<a href="/contact_edit?contact_id={{contact.id}}">Edit contact</a>
-	<form action="/engagement_create" method="GET">
-		<input type="hidden" name="contact_a_id" value="{{contact.id}}"/>
-		<select id="contact_b_id" name="contact_b_id">
-			{% for contact in contact_list_minimal %}
-			<option value="{{contact.id}}">{{contact.name}}</option>
-			{% endfor %}
-		</select>
-		<button type="submit">submit</button>
-	</form>
+	<br/>
+	<br/>
 	{% for couple_key, couple_dict in calls_by_couple.items() %}
-<h2>{{couple_dict.couple_name}}</h2>
+<h3>{{couple_dict.couple_name}}</h2>
 <a href="/engagement_create?contact_a_id={{couple_dict.contact_a_id}}&contact_b_id={{couple_dict.contact_b_id}}">Schedule new call for {{couple_dict.couple_name}}</a>
 {% for call in couple_dict.calls %}
 	 <div {{ 'class="past"' if call['relative_delta'].days < 0 or call['relative_delta'].hours < 0 }}>
@@ -52,3 +57,17 @@ div.past {
 	 </div>
 {% endfor %}
 {% endfor %}
+	<div>
+		<h3>Schedule a call with another user by selecting below:</h3>
+	<form action="/engagement_create" method="GET">
+		<input type="hidden" name="contact_a_id" value="{{contact.id}}"/>
+		<select id="contact_b_id" name="contact_b_id">
+			{% for cur_contact in contact_list_minimal %}
+			  {% if contact.id != cur_contact.id %}
+     			<option value="{{contact.id}}">{{cur_contact.name}}</option>
+			  {% endif %}
+			{% endfor %}
+		</select>
+		<button type="submit">submit</button>
+	</form>
+	</div>
