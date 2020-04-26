@@ -26,4 +26,4 @@ class Cryptmaster:
 
     def decrypt_string(self, encrypted_string):
         """Returns the raw version of the given encrypted string."""
-        return self.fernet_instance.decrypt(encrypted_string).decode('utf-8')
+        return self.fernet_instance.decrypt(encrypted_string.encode('utf-8')).decode('utf-8')

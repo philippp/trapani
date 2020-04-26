@@ -4,7 +4,6 @@ from twilio.twiml.voice_response import VoiceResponse, Say, Dial
 import pprint
 import json
 from flask import Blueprint
-import web_database
 
 twilio_blueprint = Blueprint('twilio_blueprint', __name__)
 
