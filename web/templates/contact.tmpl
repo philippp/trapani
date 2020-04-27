@@ -64,7 +64,7 @@ div.past {
 		<select id="contact_b_id" name="contact_b_id">
 			{% for cur_contact in contact_list_minimal %}
 			  {% if contact.id != cur_contact.id %}
-     			<option value="{{contact.id}}">{{cur_contact.name}}</option>
+     			<option value="{{cur_contact.id}}">{{cur_contact.name}}</option>
 			  {% endif %}
 			{% endfor %}
 		</select>

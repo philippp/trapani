@@ -1,6 +1,6 @@
 import flask
 import crypto
-import web_auth_decorator
+from web import auth_decorator
 
 auth_blueprint = flask.Blueprint('auth_blueprint', __name__)
 cryptmaster = crypto.Cryptmaster()
@@ -16,8 +16,8 @@ def login_post():
     if password == web_passphrase:
         response = flask.make_response(flask.redirect("/", code=302))
         response.set_cookie(
-            web_auth_decorator.SESSION_COOKIE_NAME,
-            cryptmaster.encrypt_string(web_auth_decorator.SESSION_EXPECTED_VALUE))
+            auth_decorator.SESSION_COOKIE_NAME,
+            cryptmaster.encrypt_string(auth_decorator.SESSION_EXPECTED_VALUE))
         return response
     else:
         return flask.redirect("/login?status=failed", code=302)

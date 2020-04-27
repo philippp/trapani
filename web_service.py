@@ -6,19 +6,16 @@ import argparse
 import config
 import pdb
 
-from web_twilio_blueprint import twilio_blueprint
-from web_admin_blueprint import admin_blueprint
-from web_auth_blueprint import auth_blueprint
+from web.twilio_blueprint import twilio_blueprint
+from web.admin_blueprint import admin_blueprint
+from web.auth_blueprint import auth_blueprint
 
-app = flask.Flask(__name__)
+app = flask.Flask(__name__, template_folder='web/templates')
+
 with app.app_context():
     app.register_blueprint(admin_blueprint)
     app.register_blueprint(twilio_blueprint)
     app.register_blueprint(auth_blueprint)
-    
-@app.route('/', methods=['GET'])
-def root():
-    return Response(str("<html>v=time<br/>%s</html>" % app.config['web_domain']), mimetype='text/xml')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

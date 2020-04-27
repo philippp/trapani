@@ -10,7 +10,7 @@ from flask import Flask, request, Response, redirect, g, current_app, Blueprint
 import jinja2
 import pdb
 import flask
-import web_auth_decorator
+from web import auth_decorator
 
 admin_blueprint = Blueprint('admin_blueprint', __name__)
 
@@ -47,8 +47,13 @@ def convert_utc_datetime_to_relative_str(dt): #relativedelta_to_str(rd):
     else:
         return "in " + time_str
 
+@admin_blueprint.route('/', methods=['GET'])
+@auth_decorator.authenticate
+def root():
+    return flask.render_template('frontpage.tmpl')    
+    
 @admin_blueprint.route('/engagements', methods=['GET'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def engagements():
     db_connection = current_app.config['db_connection']
     calls = db_connection.read_calls()
@@ -63,7 +68,7 @@ def engagements():
                                  calls = sorted(calls.values(), key=lambda c: c['time_scheduled'])[::-1])
 
 @admin_blueprint.route('/list_pairs', methods=['GET'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def list_pairs():
     db_connection = current_app.config['db_connection']
     calls = db_connection.read_calls()
@@ -82,7 +87,7 @@ def list_pairs():
     return flask.render_template('engagements.tmpl', calls_by_couple = calls_by_couple)
 
 @admin_blueprint.route('/contacts', methods=['GET'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def contacts():
     db_connection = current_app.config['db_connection']
     contacts = db_connection.read_contacts()
@@ -95,7 +100,7 @@ def contacts():
     return flask.render_template('list_contacts.tmpl', contacts = contacts)
 
 @admin_blueprint.route('/contact/<contact_id>', methods=['GET'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def contact(contact_id):
     db_connection = current_app.config['db_connection']
     contact_list = db_connection.read_contacts()
@@ -135,7 +140,7 @@ def contact(contact_id):
                                  contact_list_minimal = contact_list_minimal)
 
 @admin_blueprint.route('/contact_edit', methods=['GET'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def contact_edit_form():
     contact_id = request.args.get('contact_id')
     if contact_id:
@@ -150,7 +155,7 @@ def contact_edit_form():
     return flask.render_template('contact_edit.tmpl', contact = contact)
 
 @admin_blueprint.route('/contact_edit', methods=['POST'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def contact_edit_process():
     contact_id = request.form.get('contact_id')
     db_connection = current_app.config['db_connection']
@@ -168,7 +173,7 @@ def contact_edit_process():
     return redirect("/contacts", code=302)
 
 @admin_blueprint.route('/engagement_create', methods=['GET'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def engagement_create():
     contact_a_id = request.args.get('contact_a_id')
     contact_b_id = request.args.get('contact_b_id')
@@ -188,7 +193,7 @@ def engagement_create():
                                  contact_b = contact_b)
 
 @admin_blueprint.route('/engagement_create', methods=['POST'])
-@web_auth_decorator.authenticate
+@auth_decorator.authenticate
 def engagement_create_post():
     pprint.pprint(request.form)
     db = current_app.config['db_connection']
