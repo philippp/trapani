@@ -4,6 +4,7 @@ from twilio.twiml.voice_response import VoiceResponse, Say, Dial
 import pprint
 import json
 from flask import Blueprint
+import config
 
 twilio_blueprint = Blueprint('twilio_blueprint', __name__)
 
@@ -52,10 +53,10 @@ def bridge():
     pprint.pprint(request.form)
     answeredBy = request.args.get('AnsweredBy') or request.form.get('AnsweredBy')
     print(answeredBy)
-    b64_padded_ptoken = ptoken + "=" * (4 - len(ptoken) % 4)
     response = VoiceResponse()
     if answeredBy in ("human", "unknown"):
-        response.play("%s/media/welcome_please_wait.mp3" % config.WEB_DOMAIN_PROD, action="/dialstatus")
+        response.play("%s/media/welcome_please_wait.mp3" % config.WEB_DOMAIN_PROD,
+                      action="/dialstatus")
         dial = Dial()
         dial.conference(ptoken,
                         waitUrl="%s/media/ttv_hold_music.mp3" % config.WEB_DOMAIN_PROD,
