@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from flask import Response, g, current_app
-import flask
 from gcloud import database
+import flask
 import argparse
 import config
 import pdb

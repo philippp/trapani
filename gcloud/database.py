@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Command line administrative tool for call and text scheduling.
 """
+import mysql.connector
 import pprint
 import collections
 import pdb
@@ -9,7 +10,6 @@ import base64
 import datetime
 import uuid
 import dateutil.parser
-import mysql.connector
 import csv
 
 db_info = dict(
