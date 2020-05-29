@@ -11,6 +11,7 @@ import datetime
 import uuid
 import dateutil.parser
 import csv
+from mysql.connector import errors
 
 db_info = dict(
     dev = dict(
@@ -58,6 +59,17 @@ class Database:
             pass
         self.mysql_connection = mysql.connector.connect(**self.config)
 
+    def get_cursor(self):
+        cursor = None
+        if not self.mysql_connection:
+            self.reconnect()
+        try:
+            cursor = self.mysql_connection.cursor()
+        except errors.OperationalError:
+            self.reconnect()
+            cursor = self.mysql_connection.cursor()                
+        return cursor
+                
     def read_contacts(self, numbers = None, contact_id = None):
         where_clause = ""
         sql_var = None
@@ -90,7 +102,7 @@ GROUP BY 1,2,3,4
 ORDER BY 5 DESC
 """
 
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         if sql_var is not None:
             cursor.execute(sql_query, sql_var)
         else:
@@ -132,7 +144,7 @@ LEFT JOIN contacts ON contact_id = contacts.id
                 clauses.append(" processor_id IS NULL ")
             sql_query += ("AND".join(clauses))
                 
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         
         cursor.execute(sql_query, sql_query_params)
         records = cursor.fetchall()
@@ -162,7 +174,7 @@ FROM engagements
         if cutoff_time:
             sql_query += " WHERE time_scheduled <= %s "
                 
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         
         cursor.execute(sql_query, sql_query_params)
         records = cursor.fetchall()
@@ -196,7 +208,7 @@ FROM engagements
         sql_query = ("UPDATE " + entity_table_name + " SET processor_id = %s, "
                      "time_dispatcher_processed = CURRENT_TIMESTAMP()"
                "WHERE processor_id IS NULL AND id = %s")
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         cursor.execute(sql_query, (processor_id, entity_id))
         result = cursor.rowcount
         self.mysql_connection.commit()
@@ -251,7 +263,7 @@ ON calls.contact_b_id = contacts_b.id
                 sql_query_params.append(cutoff_time)
             sql_query += " AND ".join(clauses)
             
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         cursor.execute(sql_query, tuple(sql_query_params))
         records = cursor.fetchall()
         self.mysql_connection.commit()
@@ -272,7 +284,7 @@ ON calls.contact_b_id = contacts_b.id
         return pending_calls
 
     def edit_contact(self, contact_id, contact_name, contact_number):
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         insert_string = "UPDATE contacts SET name = %s, phone_number = %s WHERE id = %s"
         result = cursor.execute(
             insert_string,
@@ -284,7 +296,7 @@ ON calls.contact_b_id = contacts_b.id
         """Adds contacts.
         Format is {'name':contact_name, 'phone_number':contact_number}
         """
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         insert_string = "INSERT INTO contacts (name, phone_number) " \
             "VALUES (%s,%s)"
         result = cursor.executemany(
@@ -298,7 +310,7 @@ ON calls.contact_b_id = contacts_b.id
         # TODO - handle DST
         dt = dateutil.parser.parse(time_scheduled+"-07:00")
         time_scheduled = dt.astimezone(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         insert_string = "INSERT INTO texts (contact_id, message, time_scheduled, engagement_id) " \
             "VALUES (%s,%s, %s, %s)"
         
@@ -314,7 +326,7 @@ ON calls.contact_b_id = contacts_b.id
         sql_query = ("UPDATE " + entity_table_name + " SET status = %s, "
                      "status_detail = %s"
                "WHERE id = %s")
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         cursor.execute(sql_query, (status, status_detail, entity_id))
         result = cursor.rowcount
         self.mysql_connection.commit()
@@ -332,7 +344,7 @@ ON calls.contact_b_id = contacts_b.id
             time_scheduled,
             engagement_id
         ]
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         cursor.execute(insert_string, values)
         self.mysql_connection.commit()
         print("Added scheduled call #%d" % cursor.lastrowid)        
@@ -340,7 +352,7 @@ ON calls.contact_b_id = contacts_b.id
     def register_engagement(self, schedule_file_path, time_scheduled, engagement_number=1):
         insert_string = "INSERT INTO engagements (schedule_file_path, time_scheduled, engagement_number) VALUES (%s, %s, %s)"
         values = [schedule_file_path, time_scheduled, engagement_number]
-        cursor = self.mysql_connection.cursor()
+        cursor = self.get_cursor()
         cursor.execute(insert_string, values)
         self.mysql_connection.commit()
         return cursor.lastrowid
