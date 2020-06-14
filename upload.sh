@@ -6,5 +6,5 @@ gcloud compute ssh dispatcher-1 --command 'tar -xvzf bundle.tgz'
 gcloud compute scp bundle.tgz webservice-1:~/ --zone=us-central1-a
 gcloud compute scp --recurse keys webservice-1:~/
 gcloud compute ssh webservice-1 --command 'tar -xvzf bundle.tgz && rm bundle.tgz'
-gcloud compute ssh webservice-1 --command 'sudo mv /home/philippp/web_nginx /etc/nginx/sites-available && sudo ln -s /etc/nginx/sites-available/web_nginx /etc/nginx/sites-enabled && sudo nginx -t && sudo systemctl restart nginx'
+gcloud compute ssh webservice-1 --command 'sudo mv /home/philippp/web_nginx /etc/nginx/sites-available && sudo ln -sf /etc/nginx/sites-available/web_nginx /etc/nginx/sites-enabled && sudo nginx -t && sudo systemctl restart nginx'
 rm bundle.tgz
