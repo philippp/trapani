@@ -123,12 +123,12 @@ def program_texts(db, engagement, engagement_id, engagement_number):
     print("Scheduling texts at %s (call will be at %s)" % (datestring_text, engagement.time_call_scheduled))
     engagement_number = min(engagement_number, max(MESSAGE_TEMPLATES.keys()))
     db.schedule_text(engagement.contact_a['id'],
-                     MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_b['name'],
+                     MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_b['name'].split(" ")[0],
                                          TEXT_BEFORE_CALL_IN_MINUTES),
                      datestring_text,
                      engagement_id = engagement_id)
     db.schedule_text(engagement.contact_b['id'],
-                     MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_a['name'],
+                     MESSAGE_TEMPLATES[engagement_number] % (engagement.contact_a['name'].split(" ")[0],
                                          TEXT_BEFORE_CALL_IN_MINUTES),
                      datestring_text,
                      engagement_id = engagement_id)
