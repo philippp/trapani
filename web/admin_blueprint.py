@@ -28,6 +28,8 @@ def convert_utc_datetime_to_relative_str(dt): #relativedelta_to_str(rd):
 
     time_str = ""
     fragments = list()
+    if rd.months != 0:
+        fragments.append("%d months" % abs(rd.months))
     if rd.days != 0:
         fragments.append("%d days" % abs(rd.days))
     if rd.hours != 0:
@@ -37,7 +39,10 @@ def convert_utc_datetime_to_relative_str(dt): #relativedelta_to_str(rd):
     if len(fragments) == 2:
         time_str = " and ".join(fragments)
     elif len(fragments) == 3:
-        time_str = "%s, %s, and %s" % fragments
+        pdb.set_trace()
+        time_str = "%s, %s, and %s" % tuple(fragments)
+    elif len(fragments) == 4:
+        time_str = "%s, %s, %s, and %s" % tuple(fragments)
     elif fragments:
         time_str = fragments[0]
     else:
